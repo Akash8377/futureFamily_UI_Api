@@ -11,6 +11,8 @@ exports.loginUpValidataion = [
 
 // Signup Validation
 exports.signupValidation = [
+  check("first_name", "First Name is required").not().isEmpty(),
+  check("last_name", "Last Name is required").not().isEmpty(),
   check("gender", "Gender is required").not().isEmpty(),
   check("looking_for", "Looking For is required").not().isEmpty(),
   check("email", "Email is required")

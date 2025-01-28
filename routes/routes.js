@@ -3,11 +3,12 @@ const router = express.Router();
 const auth = require("../middleware/auth");
 const userController = require("../controllers/user");
 const onboardingController = require("../controllers/onboarding");
+const userProfileController = require("../controllers/userProfile");
 const { check } = require("express-validator"); // Add this import
 
 
 
-const {
+const { 
   loginUpValidataion,
   signupValidation,
   onboardValidation

@@ -13,7 +13,7 @@ exports.signup = (req, res) => {
     return res.status(400).send({ errors: errors.array() });
   }
 
-  const { looking_for, gender, email, password } = req.body;
+  const {first_name, last_name, looking_for, gender, email, password } = req.body;
 
   // Check if user already exists
   conn.query(
@@ -42,7 +42,7 @@ exports.signup = (req, res) => {
 
        
         conn.query(
-          `INSERT INTO users (gender, looking_for, email, password) VALUES (${conn.escape(gender)}, ${conn.escape(looking_for)}, ${conn.escape(email)}, ${conn.escape(hash)})`,
+          `INSERT INTO users (first_name, last_name, gender, looking_for, email, password) VALUES (${conn.escape(first_name)}, ${conn.escape(last_name)}, ${conn.escape(gender)}, ${conn.escape(looking_for)}, ${conn.escape(email)}, ${conn.escape(hash)})`,
           (insertErr, insertResult) => {
             if (insertErr) {
               return res.status(500).send({
