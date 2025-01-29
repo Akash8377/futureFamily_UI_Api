@@ -14,7 +14,7 @@ exports.onboarding = (req, res) => {
       return res.status(400).send({ errors: errors.array() });
     }
   
-    const { email, profile_pic, dna, screen_name, city, dob, personality_type } = req.body;
+    const { email, profile_pic, dna, screen_name, city, latitude, longitude, dob, personality_type } = req.body;
   
     // Check if the user already exists
     conn.query(
@@ -36,7 +36,9 @@ exports.onboarding = (req, res) => {
             dna = ${conn.escape(dna)}, 
              profile_pic = ${conn.escape(profile_pic)},
                  dob = ${conn.escape(dob)}, 
-                 city_of_residence = ${conn.escape(city)}, 
+                 city_of_residence = ${conn.escape(city)},
+                 latitude = ${conn.escape(latitude)},  
+                 longitude = ${conn.escape(longitude)}, 
                  personality_type = ${conn.escape(personality_type)} 
              WHERE email = ${conn.escape(email)}`,
             (updateErr) => {
