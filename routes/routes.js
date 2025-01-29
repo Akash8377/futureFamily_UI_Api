@@ -18,6 +18,7 @@ const {
 router.post("/signup", signupValidation, userController.signup);
 router.post("/onboarding", auth.verifyToken,onboardValidation, onboardingController.onboarding);
 router.post("/login", loginUpValidataion, userController.getUserLogin);
+router.get("/get-login", auth.verifyToken, loginUpValidataion, userController.getLogin);
 router.get("/welcome", auth.verifyToken, userController.welcome);
 router.post("/logout", auth.verifyToken, userController.logout);
 
