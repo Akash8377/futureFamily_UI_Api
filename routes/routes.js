@@ -16,14 +16,15 @@ const {
 
 //user login/signup routes
 router.post("/signup", signupValidation, userController.signup);
-router.post("/onboarding", onboardValidation, onboardingController.onboarding);
+router.post("/onboarding", auth.verifyToken,onboardValidation, onboardingController.onboarding);
 router.post("/login", loginUpValidataion, userController.getUserLogin);
 router.get("/welcome", auth.verifyToken, userController.welcome);
-router.post("/logout", userController.logout);
+router.post("/logout", auth.verifyToken, userController.logout);
 
 //user Profile routes
 router.post(
   "/add-profile",
+  auth.verifyToken,
   userProfileValidation,
   userProfileController.add_user_profile
 );
