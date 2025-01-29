@@ -35,14 +35,9 @@ exports.onboardValidation = [
 ];
 
 
-// exports.rideValidation = [
-//   check("vehicle_id", "Vehicle ID is required").isInt(),
-//   check("service_type", "Service Type is required").not().isEmpty(),
-//   check("pickup_date", "Pickup Date is required").isDate(),
-//   check("pickup_time", "Pickup Time is required").not().isEmpty(),
-//   check("pickup_location", "Pickup Location is required").not().isEmpty(),
-//   check("dropoff_location", "Dropoff Location is required").not().isEmpty(),
-//   check("passengers", "Number of Passengers is required").isInt(),
-// ];
+// User Profile Validation
+exports.userProfileValidation = [
+  check("user_id", "User ID is required").not().isEmpty(),
+];
 
 
