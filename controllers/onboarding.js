@@ -14,7 +14,7 @@ exports.onboarding = (req, res) => {
       return res.status(400).send({ errors: errors.array() });
     }
   
-    const { email, screen_name, city, dob, personality_type } = req.body;
+    const { email, profile_pic, dna, screen_name, city, dob, personality_type } = req.body;
   
     // Check if the user already exists
     conn.query(
@@ -32,6 +32,9 @@ exports.onboarding = (req, res) => {
           conn.query(
             `UPDATE users 
              SET screen_name = ${conn.escape(screen_name)}, 
+            profile_pic = ${conn.escape(profile_pic)}, 
+            dna = ${conn.escape(dna)}, 
+             profile_pic = ${conn.escape(profile_pic)},
                  dob = ${conn.escape(dob)}, 
                  city_of_residence = ${conn.escape(city)}, 
                  personality_type = ${conn.escape(personality_type)} 

@@ -13,7 +13,8 @@ exports.signup = (req, res) => {
     return res.status(400).send({ errors: errors.array() });
   }
 
-  const {first_name, last_name, looking_for, gender, email, password } = req.body;
+  const { first_name, last_name, looking_for, gender, email, password } =
+    req.body;
 
   // Check if user already exists
   conn.query(
@@ -40,9 +41,12 @@ exports.signup = (req, res) => {
           });
         }
 
-       
         conn.query(
-          `INSERT INTO users (first_name, last_name, gender, looking_for, email, password) VALUES (${conn.escape(first_name)}, ${conn.escape(last_name)}, ${conn.escape(gender)}, ${conn.escape(looking_for)}, ${conn.escape(email)}, ${conn.escape(hash)})`,
+          `INSERT INTO users (first_name, last_name, gender, looking_for, email, password) VALUES (${conn.escape(
+            first_name
+          )}, ${conn.escape(last_name)}, ${conn.escape(gender)}, ${conn.escape(
+            looking_for
+          )}, ${conn.escape(email)}, ${conn.escape(hash)})`,
           (insertErr, insertResult) => {
             if (insertErr) {
               return res.status(500).send({
@@ -64,10 +68,6 @@ exports.signup = (req, res) => {
     }
   );
 };
-
-
-
-
 
 // Login function User login
 
@@ -99,12 +99,10 @@ exports.getUserLogin = (req, res) => {
             });
           }
           if (bresult) {
-            const token = jwt.sign(
-              { id: result[0]["id"] },
-              token_key,
-              { expiresIn: "1h" }
-            );
-           
+            const token = jwt.sign({ id: result[0]["id"] }, token_key, {
+              expiresIn: "1h",
+            });
+
             res.status(200).send({
               status: "success",
               token,
@@ -156,5 +154,3 @@ exports.logout = (req, res) => {
 
   res.status(200).send({ message: "Logged out successfully" });
 };
-
-

@@ -1,13 +1,11 @@
 const { check } = require("express-validator");
 
-
 exports.loginUpValidataion = [
   check("email", "Email is required")
     .isEmail()
     .normalizeEmail({ gmail_remove_dots: true }),
   check("password", "Password is required").not().isEmpty(),
 ];
-
 
 // Signup Validation
 exports.signupValidation = [
@@ -18,8 +16,9 @@ exports.signupValidation = [
   check("email", "Email is required")
     .isEmail()
     .normalizeEmail({ gmail_remove_dots: true }),
-  check("password", "Password must be at least 6 characters long")
-    .isLength({ min: 6 }),
+  check("password", "Password must be at least 6 characters long").isLength({
+    min: 6,
+  }),
 ];
 
 // Onboard Validation
@@ -28,16 +27,13 @@ exports.onboardValidation = [
   check("email", "Email is required")
     .isEmail()
     .normalizeEmail({ gmail_remove_dots: true }),
-    check("screen_name", "Screen Name is required").not().isEmpty(),
-    check("dob", "DOB is required").not().isEmpty(),
-    check("city", "City is required").not().isEmpty(),
-    check("personality_type", "Personality Type is required").not().isEmpty(),
+  check("screen_name", "Screen Name is required").not().isEmpty(),
+  check("dob", "DOB is required").not().isEmpty(),
+  check("city", "City is required").not().isEmpty(),
+  check("personality_type", "Personality Type is required").not().isEmpty(),
 ];
-
 
 // User Profile Validation
 exports.userProfileValidation = [
   check("user_id", "User ID is required").not().isEmpty(),
 ];
-
-
