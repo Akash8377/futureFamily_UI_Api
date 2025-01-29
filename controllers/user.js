@@ -124,14 +124,12 @@ exports.getUserLogin = (req, res) => {
 // Login function get login
 
 exports.getLogin = (req, res) => {
-  // Since the user is already authenticated, get userId from the request
-  const userId = req.headers.user_id;
+  const userId = req.userId; // Get user ID from middleware
 
   if (!userId) {
     return res.status(401).send({ msg: "Unauthorized" });
   }
 
-  // Fetch user details using the userId from the JWT token
   conn.query("SELECT * FROM users WHERE id = ?", [userId], (err, result) => {
     if (err) {
       return res.status(500).send({ msg: "Database error", error: err });
@@ -143,10 +141,11 @@ exports.getLogin = (req, res) => {
 
     res.status(200).send({
       status: "success",
-      user: result[0], // Return only relevant user details
+      user: result[0],
     });
   });
 };
+
 
 
 // Get login User Profile
