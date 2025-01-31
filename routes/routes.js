@@ -11,7 +11,7 @@ const {
   loginUpValidataion,
   signupValidation,
   onboardValidation,
-  userProfileValidation,
+  userProfileDataValidation,
 } = require("../helper/validation");
 
 //user login/signup routes
@@ -26,21 +26,22 @@ router.post("/logout", auth.verifyToken, userController.logout);
 router.post(
   "/add-profile",
   auth.verifyToken,
-  userProfileValidation,
+  userProfileDataValidation,
   userProfileController.add_user_profile
 );
 router.get(
-  "/edit-profile/:user_id",
+  "/edit-profile",
   auth.verifyToken,
   userProfileController.edit
 );
 router.put(
-  "/update-profile/:user_id",
+  "/update-profile",
   auth.verifyToken,
   userProfileController.update
 );
 
 //user Filter routes
 router.get("/filter-users", userFilterController.filter_users);
+router.get("/filter-get_matching_percentage", userFilterController.get_matching_percentage);
 
 module.exports = router; // export to use in server.js
