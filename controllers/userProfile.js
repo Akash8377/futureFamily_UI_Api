@@ -144,8 +144,9 @@ exports.add_user_profile = (req, res) => {
 
 exports.edit = (req, res) => {
   const sqlQuery =
-    "SELECT * FROM profile_data WHERE user_id=" +
-     req.userId;
+    `SELECT u.*, p.* FROM users u
+     LEFT JOIN profile_data p ON u.id = p.user_id
+     WHERE u.id = ${req.userId}`;
 
   conn.query(sqlQuery, (err, result) => {
     if (err) {
@@ -155,17 +156,34 @@ exports.edit = (req, res) => {
       });
     } else if (result.length === 0) {
       return res.status(404).send({
-        msg: "User profile not found",
+        msg: "User not found",
       });
     } else {
-      res.status(200).send({
-        status: "success",
-        length: result.length,
-        data: result,
-      });
+      // Check if the user has no profile data
+      if (result[0].id && !result[0].user_id) {
+        // Send only user data if no profile exists
+        res.status(200).send({
+          status: "success",
+          length: result.length,
+          data: result.map((user) => ({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            // Add other fields from the users table
+          })),
+        });
+      } else {
+        // Send both user and profile data if profile exists
+        res.status(200).send({
+          status: "success",
+          length: result.length,
+          data: result,
+        });
+      }
     }
   });
 };
+
 
 exports.update = (req, res) => {
   // Validate user input

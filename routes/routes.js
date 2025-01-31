@@ -17,9 +17,14 @@ const {
 
 //user login/signup routes
 router.post("/signup", signupValidation, userController.signup);
-router.post("/onboarding",onboardValidation, onboardingController.onboarding);
+router.post("/onboarding", onboardValidation, onboardingController.onboarding);
 router.post("/login", loginUpValidataion, userController.getUserLogin);
-router.get("/get-login", auth.verifyToken, loginUpValidataion, userController.getLogin);
+router.get(
+  "/get-login",
+  auth.verifyToken,
+  loginUpValidataion,
+  userController.getLogin
+);
 router.get("/welcome", auth.verifyToken, userController.welcome);
 router.post("/logout", auth.verifyToken, userController.logout);
 
@@ -30,21 +35,15 @@ router.post(
   userProfileDataValidation,
   userProfileController.add_user_profile
 );
-router.get(
-  "/edit-profile",
-  auth.verifyToken,
-  userProfileController.edit
-);
-router.put(
-  "/update-profile",
-  auth.verifyToken,
-  userProfileController.update
-);
+router.get("/edit-profile", auth.verifyToken, userProfileController.edit);
+router.put("/update-profile", auth.verifyToken, userProfileController.update);
 
 //user Filter routes
-router.get("/filter-users", auth.verifyToken, userFilterController.filter_users);
-router.get("/calculateMatchPercentage", auth.verifyToken, userFilterController.findMatches);
-
+router.get(
+  "/filter-users",
+  auth.verifyToken,
+  userFilterController.filter_users
+);
 
 //file upload route
 router.post("/upload", fileController.upload);
