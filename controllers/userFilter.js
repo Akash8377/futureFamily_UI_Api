@@ -35,7 +35,8 @@ exports.filter_users = (req, res) => {
 
       // Start SQL query to fetch matching users
       let query = `
-        SELECT profile_data.*, users.dob, 
+        SELECT profile_data.*, users.dob,
+        users.first_name, users.last_name, 
         TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age
         FROM profile_data
         JOIN users ON profile_data.user_id = users.id
