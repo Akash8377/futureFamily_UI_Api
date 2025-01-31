@@ -6,6 +6,7 @@ const onboardingController = require("../controllers/onboarding");
 const userProfileController = require("../controllers/userProfile");
 const userFilterController = require("../controllers/userFilter");
 const { check } = require("express-validator"); // Add this import
+const fileController = require("../controllers/file.controller");
 
 const {
   loginUpValidataion,
@@ -41,7 +42,11 @@ router.put(
 );
 
 //user Filter routes
-router.get("/filter-users", userFilterController.filter_users);
-router.get("/filter-get_matching_percentage", userFilterController.get_matching_percentage);
+router.get("/filter-users", auth.verifyToken, userFilterController.filter_users);
+router.get("/calculateMatchPercentage", auth.verifyToken, userFilterController.findMatches);
+
+
+//file upload route
+router.post("/upload", fileController.upload);
 
 module.exports = router; // export to use in server.js
