@@ -50,7 +50,7 @@ exports.add_user_profile = (req, res) => {
     family_dynamics,
     relationship_with_parents,
     importance_of_family,
-  } = req.headers;
+  } = req.body;
 
   // Check if the user already has a profile
   conn.query(
@@ -236,7 +236,7 @@ exports.update = (req, res) => {
     family_dynamics,
     relationship_with_parents,
     importance_of_family,
-  } = req.headers; // Use `req.body` instead of `req.headers`
+  } = req.body; // Use `req.body` instead of `req.headers`
 
   if (!user_id) {
     return res.status(401).json({ status: "error", msg: "User ID missing" });

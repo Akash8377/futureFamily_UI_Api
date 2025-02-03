@@ -6,6 +6,68 @@ const jwt = require("jsonwebtoken");
 const token_key = process.env.TOKEN_KEY;
 
 // Signup Function
+// exports.signup = (req, res) => {
+//   // Validate user input
+//   const errors = validationResult(req);
+//   if (!errors.isEmpty()) {
+//     return res.status(400).send({ errors: errors.array() });
+//   }
+
+//   const { first_name, last_name, looking_for, gender, email, password } =
+//     req.body;
+
+//   // Check if user already exists
+//   conn.query(
+//     `SELECT * FROM users WHERE email = ${conn.escape(email)}`,
+//     (err, result) => {
+//       if (err) {
+//         return res.status(500).send({
+//           msg: "Database error",
+//           error: err,
+//         });
+//       }
+//       if (result.length) {
+//         return res.status(400).send({
+//           msg: "User already exists!",
+//         });
+//       }
+
+//       // Hash password before saving
+//       bcrypt.hash(password, 10, (hashErr, hash) => {
+//         if (hashErr) {
+//           return res.status(500).send({
+//             msg: "Error hashing password",
+//             error: hashErr,
+//           });
+//         }
+
+//         conn.query(
+//           `INSERT INTO users (first_name, last_name, gender, looking_for, email, password) VALUES (${conn.escape(
+//             first_name
+//           )}, ${conn.escape(last_name)}, ${conn.escape(gender)}, ${conn.escape(
+//             looking_for
+//           )}, ${conn.escape(email)}, ${conn.escape(hash)})`,
+//           (insertErr, insertResult) => {
+//             if (insertErr) {
+//               return res.status(500).send({
+//                 msg: "Database error",
+//                 error: insertErr,
+//               });
+//             }
+//             return res.status(201).send({
+//               status: "success",
+//               msg: "User registered successfully!",
+//               data: {
+//                 id: insertResult.insertId,
+//                 email,
+//               },
+//             });
+//           }
+//         );
+//       });
+//     }
+//   );
+// };
 exports.signup = (req, res) => {
   // Validate user input
   const errors = validationResult(req);
@@ -13,8 +75,7 @@ exports.signup = (req, res) => {
     return res.status(400).send({ errors: errors.array() });
   }
 
-  const { first_name, last_name, looking_for, gender, email, password } =
-    req.body;
+  const { first_name, last_name, looking_for, gender, email, password } = req.body;
 
   // Check if user already exists
   conn.query(
@@ -41,34 +102,45 @@ exports.signup = (req, res) => {
           });
         }
 
-        conn.query(
-          `INSERT INTO users (first_name, last_name, gender, looking_for, email, password) VALUES (${conn.escape(
-            first_name
-          )}, ${conn.escape(last_name)}, ${conn.escape(gender)}, ${conn.escape(
-            looking_for
-          )}, ${conn.escape(email)}, ${conn.escape(hash)})`,
-          (insertErr, insertResult) => {
-            if (insertErr) {
+        // Insert user into users table
+        const userInsertQuery = `INSERT INTO users (first_name, last_name, gender, looking_for, email, password) VALUES (?, ?, ?, ?, ?, ?)`;
+        const userValues = [first_name, last_name, gender, looking_for, email, hash];
+
+        conn.query(userInsertQuery, userValues, (insertErr, insertResult) => {
+          if (insertErr) {
+            return res.status(500).send({
+              msg: "Database error while inserting user",
+              error: insertErr,
+            });
+          }
+
+          const user_id = insertResult.insertId; // Get the inserted user's ID
+
+          // Insert empty profile record for the user
+          const profileInsertQuery = `INSERT INTO profile_data (user_id, created_at, updated_at) VALUES (?, NOW(), NOW())`;
+
+          conn.query(profileInsertQuery, [user_id], (profileErr) => {
+            if (profileErr) {
               return res.status(500).send({
-                msg: "Database error",
-                error: insertErr,
+                msg: "Database error while creating user profile",
+                error: profileErr,
               });
             }
+
             return res.status(201).send({
               status: "success",
               msg: "User registered successfully!",
               data: {
-                id: insertResult.insertId,
+                id: user_id,
                 email,
               },
             });
-          }
-        );
+          });
+        });
       });
     }
   );
 };
-
 // Login function User login
 
 exports.getUserLogin = (req, res) => {
