@@ -112,7 +112,7 @@ exports.filter_users = (req, res) => {
         family_dynamics,
         relationship_with_parents,
         importance_of_family,
-      } = req.query;
+      } = req.body;
 
       if (min_height) {
         query += ` AND height >= ?`;
