@@ -22,7 +22,7 @@ exports.filter_users = (req, res) => {
 
   // Fetch logged-in user's profile
   conn.query(
-    `SELECT * FROM profile_data WHERE user_id = ?`,
+    `SELECT * FROM profile_data JOIN users ON profile_data.user_id = users.id WHERE user_id = ?`,
     [user_id],
     (err, loggedInUserData) => {
       if (err || loggedInUserData.length === 0) {
@@ -32,19 +32,50 @@ exports.filter_users = (req, res) => {
       }
 
       const loggedInUser = loggedInUserData[0]; // Store logged-in user's profile
+      let { gender, looking_for } = loggedInUser;
+
+      // console.log("Logged-in user:", loggedInUser);
+
+      // Ensure looking_for is a valid array
+      let lookingForArray = [];
+      if (typeof looking_for === "string") {
+        lookingForArray = looking_for.split(",").map(Number); // Convert "1,0" → [1, 0]
+      } else if (typeof looking_for === "number") {
+        lookingForArray = [looking_for]; // Single number case
+      }
+
+      if (lookingForArray.length === 0) {
+        return res.status(400).json({ msg: "Invalid looking_for value" });
+      }
 
       // Start SQL query to fetch matching users
       let query = `
-        SELECT profile_data.*, users.dob,
-        users.first_name, users.last_name, 
-        TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age
-        FROM profile_data
-        JOIN users ON profile_data.user_id = users.id
-        WHERE users.id != ?
-      `;
-      let queryParams = [user_id];
+                SELECT profile_data.*, users.dob, users.gender, users.looking_for,
+                users.first_name, users.last_name, 
+                TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age
+                FROM profile_data
+                JOIN users ON profile_data.user_id = users.id
+                WHERE users.id != ? AND users.gender IN (?)
+            `;
+      let queryParams = [user_id, lookingForArray];
 
       // Extract filter parameters
+      const lastFilterData = JSON.stringify(req.query);
+
+      // Update last_filter column in users table
+      conn.query(
+        `UPDATE users SET last_filter = ? WHERE id = ?`,
+        [lastFilterData, user_id],
+        (updateErr) => {
+          if (updateErr) {
+            // console.error("Error updating last filter:", updateErr);
+          } else {
+            // console.log("Last filter updated successfully:", lastFilterData);
+          }
+        }
+      );
+
+      // Apply dynamic filters (explicit conditions)
       const {
         min_height,
         max_height,
@@ -83,7 +114,6 @@ exports.filter_users = (req, res) => {
         importance_of_family,
       } = req.query;
 
-      // Apply dynamic filters
       if (min_height) {
         query += ` AND height >= ?`;
         queryParams.push(min_height);
@@ -100,21 +130,29 @@ exports.filter_users = (req, res) => {
         query += ` AND weight <= ?`;
         queryParams.push(max_weight);
       }
+     
       if (body_type) {
-        query += ` AND body_type = ?`;
-        queryParams.push(body_type);
-      }
+        let body_typeArray = body_type.split(',').map(color => color.trim());  
+        query += ` AND body_type IN (?)`;  
+        queryParams.push(body_typeArray);
+    }
+     
       if (ethnicity) {
-        query += ` AND ethnicity = ?`;
-        queryParams.push(ethnicity);
-      }
+        let ethnicityArray = ethnicity.split(',').map(color => color.trim());  
+        query += ` AND ethnicity IN (?)`;  
+        queryParams.push(ethnicityArray);
+    }
       if (eye_color) {
-        query += ` AND eye_color = ?`;
-        queryParams.push(eye_color);
+        let eyeColorsArray = eye_color.split(",").map((color) => color.trim());
+        query += ` AND eye_color IN (?)`;
+        queryParams.push(eyeColorsArray);
       }
       if (hair_color) {
-        query += ` AND hair_color = ?`;
-        queryParams.push(hair_color);
+        let hairColorsArray = hair_color
+          .split(",")
+          .map((color) => color.trim());
+        query += ` AND hair_color IN (?)`;
+        queryParams.push(hairColorsArray);
       }
       if (blood_type) {
         query += ` AND blood_type = ?`;
@@ -184,9 +222,13 @@ exports.filter_users = (req, res) => {
         query += ` AND social_preferences = ?`;
         queryParams.push(social_preferences);
       }
+
       if (preferred_environment) {
-        query += ` AND preferred_environment = ?`;
-        queryParams.push(preferred_environment);
+        let preferred_environmentColorsArray = preferred_environment
+          .split(",")
+          .map((color) => color.trim());
+        query += ` AND preferred_environment IN (?)`;
+        queryParams.push(preferred_environmentColorsArray);
       }
       if (importance_of_travel) {
         query += ` AND importance_of_travel = ?`;
@@ -207,22 +249,6 @@ exports.filter_users = (req, res) => {
       if (career_goals) {
         query += ` AND career_goals = ?`;
         queryParams.push(career_goals);
-      }
-      if (cultural_or_religious_beliefs) {
-        query += ` AND cultural_or_religious_beliefs = ?`;
-        queryParams.push(cultural_or_religious_beliefs);
-      }
-      if (family_dynamics) {
-        query += ` AND family_dynamics = ?`;
-        queryParams.push(family_dynamics);
-      }
-      if (relationship_with_parents) {
-        query += ` AND relationship_with_parents = ?`;
-        queryParams.push(relationship_with_parents);
-      }
-      if (importance_of_family) {
-        query += ` AND importance_of_family = ?`;
-        queryParams.push(importance_of_family);
       }
 
       // Execute the query to fetch filtered users
@@ -386,4 +412,39 @@ const calculateMatchPercentage = (userA, userB) => {
   // Calculate final match percentage
   const matchPercentage = (matchScore / totalWeight) * 100;
   return matchPercentage.toFixed(2);
+};
+
+exports.apply_last_filter = (req, res) => {
+  // Get user ID from JWT (set in authentication middleware)
+  const user_id = req.userId;
+  if (!user_id) {
+    return res
+      .status(401)
+      .json({ msg: "Unauthorized: User ID missing from token" });
+  }
+
+  // Fetch the last stored filter from the users table
+  conn.query(
+    `SELECT last_filter FROM users WHERE id = ?`,
+    [user_id],
+    (err, result) => {
+      if (err || result.length === 0) {
+        return res.status(500).json({ msg: "Error retrieving last filter" });
+      }
+
+      // Parse the last filter JSON
+      let lastFilter = {};
+      try {
+        lastFilter = JSON.parse(result[0].last_filter || "{}");
+      } catch (parseErr) {
+        return res
+          .status(500)
+          .json({ msg: "Error parsing last filter", error: parseErr });
+      }
+
+      // Assign last filter values to req.query and call filter_users
+      req.query = lastFilter;
+      exports.filter_users(req, res);
+    }
+  );
 };

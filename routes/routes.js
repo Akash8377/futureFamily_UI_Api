@@ -44,6 +44,11 @@ router.get(
   auth.verifyToken,
   userFilterController.filter_users
 );
+router.get(
+  "/apply-last-filter",
+  auth.verifyToken,
+  userFilterController.apply_last_filter
+);
 
 //file upload route
 router.post("/upload", fileController.upload);
