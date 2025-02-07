@@ -30,7 +30,7 @@ exports.onboardValidation = [
   check("screen_name", "Screen Name is required").not().isEmpty(),
   check("dob", "DOB is required").not().isEmpty(),
   check("city", "City is required").not().isEmpty(),
-  check("personality_type", "Personality Type is required").not().isEmpty(),
+  check("personality_type", "Personality Type is required").isEmpty(),
 ];
 
 
