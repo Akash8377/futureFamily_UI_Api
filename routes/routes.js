@@ -5,6 +5,7 @@ const userController = require("../controllers/user");
 const onboardingController = require("../controllers/onboarding");
 const userProfileController = require("../controllers/userProfile");
 const userFilterController = require("../controllers/userFilter");
+const userPersonalityController = require("../controllers/userPersonality");
 const { check } = require("express-validator"); // Add this import
 const fileController = require("../controllers/file.controller");
 
@@ -48,6 +49,18 @@ router.get(
   "/apply-last-filter",
   auth.verifyToken,
   userFilterController.apply_last_filter
+);
+
+// save user personality response
+router.post(
+  "/user-personality",
+  auth.verifyToken,
+  userPersonalityController.savePersonalityResponses
+);
+router.get(
+  "/get-personality-report",
+  auth.verifyToken,
+  userPersonalityController.getPersonalityReport
 );
 
 //file upload route
