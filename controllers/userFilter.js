@@ -51,7 +51,7 @@ exports.filter_users = (req, res) => {
       // Start SQL query to fetch matching users
       let query = `
                 SELECT profile_data.*, users.dob, users.gender, users.looking_for,
-                users.first_name, users.last_name, users.profile_pic, users.dna,
+                users.first_name, users.last_name, users.profile_pic, users.dna, users.personality_type,
                 TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age
                 FROM profile_data
                 JOIN users ON profile_data.user_id = users.id
@@ -445,6 +445,66 @@ exports.apply_last_filter = (req, res) => {
       // Assign last filter values to req.query and call filter_users
       req.query = lastFilter;
       exports.filter_users(req, res);
+    }
+  );
+};
+
+
+const getUserDetailsWithMatch = (loggedInUser, targetUserId, callback) => {
+  // Fetch the target user's profile
+  conn.query(
+    `SELECT profile_data.*, users.dob, users.gender, users.looking_for, 
+    users.first_name, users.last_name, users.profile_pic, users.dna, users.personality_type,
+    TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age
+    FROM profile_data
+    JOIN users ON profile_data.user_id = users.id
+    WHERE users.id = ?`,
+    [targetUserId],
+    (err, targetUserData) => {
+      if (err || targetUserData.length === 0) {
+        return callback({ msg: "User not found or database error", error: err }, null);
+      }
+
+      const targetUser = targetUserData[0];
+      
+      // Calculate match percentage
+      const matchPercentage = calculateMatchPercentage(loggedInUser, targetUser);
+
+      return callback(null, { ...targetUser, match_percentage: matchPercentage });
+    }
+  );
+};
+
+exports.get_user_details = (req, res) => {
+  const user_id = req.userId; // Logged-in user
+  const targetUserId = req.params.userId; // Target user from URL
+
+  if (!user_id) {
+    return res.status(401).json({ msg: "Unauthorized: User ID missing from token" });
+  }
+
+  // Fetch logged-in user data
+  conn.query(
+    `SELECT * FROM profile_data JOIN users ON profile_data.user_id = users.id WHERE user_id = ?`,
+    [user_id],
+    (err, loggedInUserData) => {
+      if (err || loggedInUserData.length === 0) {
+        return res.status(500).json({ msg: "Error fetching logged-in user profile" });
+      }
+
+      const loggedInUser = loggedInUserData[0];
+
+      // Fetch target user details and calculate match percentage
+      getUserDetailsWithMatch(loggedInUser, targetUserId, (error, userDetails) => {
+        if (error) {
+          return res.status(500).json(error);
+        }
+
+        return res.status(200).json({
+          status: "success",
+          user: userDetails,
+        });
+      });
     }
   );
 };

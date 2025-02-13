@@ -61,11 +61,11 @@ exports.savePersonalityResponses = (req, res) => {
     // Query to get the highest trait score
     const traitScoreQuery = `
       SELECT pq.trait, 
-       ROUND(AVG(upr.response) * (100/5), 2) AS score 
-FROM user_personality_responses upr
-JOIN personality_questions pq ON upr.question_id = pq.id
-WHERE upr.user_id = ?
-GROUP BY pq.trait;
+             ROUND(AVG(upr.response) * (100/5), 2) AS score 
+      FROM user_personality_responses upr
+      JOIN personality_questions pq ON upr.question_id = pq.id
+      WHERE upr.user_id = ?
+      GROUP BY pq.trait;
     `;
 
     conn.query(traitScoreQuery, [user_id], (err, result) => {
@@ -74,12 +74,28 @@ GROUP BY pq.trait;
           .status(500)
           .json({ msg: "Error fetching trait scores", error: err });
       }
-      res
-        .status(200)
-        .json({ msg: "Responses updated successfully", top_trait: result });
+
+      // Send response to the client first
+      res.status(200).json({ msg: "Responses updated successfully", top_trait: result });
+
+      // **New Functionality: Update personality_type separately**
+      if (result.length > 0) {
+        const highestTrait = result.reduce((max, trait) =>
+          trait.score > max.score ? trait : max
+        ).trait;
+
+        const updateUserQuery = `UPDATE users SET personality_type = ? WHERE id = ?`;
+
+        conn.query(updateUserQuery, [highestTrait, user_id], (updateErr) => {
+          if (updateErr) {
+            console.error("Error updating personality type:", updateErr);
+          }
+        });
+      }
     });
   });
 };
+
 
 exports.getPersonalityReport = (req, res) => {
   const user_id = req.userId;
@@ -179,31 +195,46 @@ const generatePersonalityPatterns = (topTraits) => {
 const generatePersonalitySummary = (topTraits) => {
   // Trait descriptions for better storytelling
   const traitDescriptions = {
-    Openness: "a naturally curious and imaginative thinker, drawn to new ideas and creative solutions",
-    Conscientiousness: "a highly disciplined and detail-oriented individual who values structure and reliability",
-    Extraversion: "a socially confident and energetic person who thrives in dynamic environments",
-    Agreeableness: "a compassionate and empathetic soul, always considering the well-being of others",
-    Neuroticism: "a deeply introspective individual who experiences emotions with great intensity and depth",
+    Openness:
+      "a naturally curious and imaginative thinker, drawn to new ideas and creative solutions",
+    Conscientiousness:
+      "a highly disciplined and detail-oriented individual who values structure and reliability",
+    Extraversion:
+      "a socially confident and energetic person who thrives in dynamic environments",
+    Agreeableness:
+      "a compassionate and empathetic soul, always considering the well-being of others",
+    Neuroticism:
+      "a deeply introspective individual who experiences emotions with great intensity and depth",
   };
 
   // Strengths associated with each trait
   const traitStrengths = {
-    Openness: "Your ability to embrace new ideas makes you an innovative problem solver, always seeking creative solutions.",
-    Conscientiousness: "Your structured approach to life helps you achieve ambitious goals with persistence and precision.",
-    Extraversion: "Your enthusiasm and charisma make you a natural leader, effortlessly connecting with people and inspiring them.",
-    Agreeableness: "Your kindness and emotional intelligence make you a trusted friend and a strong team player.",
-    Neuroticism: "Your emotional depth grants you strong self-awareness, allowing you to navigate complex feelings with insight.",
+    Openness:
+      "Your ability to embrace new ideas makes you an innovative problem solver, always seeking creative solutions.",
+    Conscientiousness:
+      "Your structured approach to life helps you achieve ambitious goals with persistence and precision.",
+    Extraversion:
+      "Your enthusiasm and charisma make you a natural leader, effortlessly connecting with people and inspiring them.",
+    Agreeableness:
+      "Your kindness and emotional intelligence make you a trusted friend and a strong team player.",
+    Neuroticism:
+      "Your emotional depth grants you strong self-awareness, allowing you to navigate complex feelings with insight.",
   };
 
   // Extract the top trait descriptions and strengths
-  const descriptions = topTraits.map((trait) => traitDescriptions[trait.trait]).join(", ");
-  const strengths = topTraits.map((trait) => traitStrengths[trait.trait]).join(" ");
+  const descriptions = topTraits
+    .map((trait) => traitDescriptions[trait.trait])
+    .join(", ");
+  const strengths = topTraits
+    .map((trait) => traitStrengths[trait.trait])
+    .join(" ");
 
   // Generate a more personalized, natural-flowing summary
   return `
     You are ${descriptions}. ${strengths}
-    Your strengths lie in your ability to ${topTraits.map((trait) => traitStrengths[trait.trait].split(".")[0]).join(", and ")}.
+    Your strengths lie in your ability to ${topTraits
+      .map((trait) => traitStrengths[trait.trait].split(".")[0])
+      .join(", and ")}.
     Whether you're problem-solving, building relationships, or striving towards your goals.
   `;
 };
-

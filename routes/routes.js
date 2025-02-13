@@ -50,6 +50,7 @@ router.get(
   auth.verifyToken,
   userFilterController.apply_last_filter
 );
+router.get("/get-user/:userId", auth.verifyToken, userFilterController.get_user_details);
 
 // save user personality response
 router.post(
