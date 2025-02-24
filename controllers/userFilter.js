@@ -6,18 +6,14 @@ const jwt = require("jsonwebtoken");
 const token_key = process.env.TOKEN_KEY;
 
 exports.filter_users = (req, res) => {
-  // Validate input parameters
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).send({ errors: errors.array() });
   }
 
-  // Get user ID from JWT (set in authentication middleware)
   const user_id = req.userId;
   if (!user_id) {
-    return res
-      .status(401)
-      .json({ msg: "Unauthorized: User ID missing from token" });
+    return res.status(401).json({ msg: "Unauthorized: User ID missing from token" });
   }
 
   // Fetch logged-in user's profile
@@ -26,38 +22,39 @@ exports.filter_users = (req, res) => {
     [user_id],
     (err, loggedInUserData) => {
       if (err || loggedInUserData.length === 0) {
-        return res
-          .status(500)
-          .json({ msg: "Error fetching logged-in user profile" });
+        return res.status(500).json({ msg: "Error fetching logged-in user profile" });
       }
 
-      const loggedInUser = loggedInUserData[0]; // Store logged-in user's profile
+      const loggedInUser = loggedInUserData[0];
       let { gender, looking_for } = loggedInUser;
 
-      // console.log("Logged-in user:", loggedInUser);
-
-      // Ensure looking_for is a valid array
+      // Convert `looking_for` to an array
       let lookingForArray = [];
       if (typeof looking_for === "string") {
-        lookingForArray = looking_for.split(",").map(Number); // Convert "1,0" → [1, 0]
+        lookingForArray = looking_for.split(",").map(Number);
       } else if (typeof looking_for === "number") {
-        lookingForArray = [looking_for]; // Single number case
+        lookingForArray = [looking_for];
       }
 
       if (lookingForArray.length === 0) {
         return res.status(400).json({ msg: "Invalid looking_for value" });
       }
 
-      // Start SQL query to fetch matching users
       let query = `
-                SELECT profile_data.*, users.dob, users.gender, users.looking_for,
-                users.first_name, users.last_name, users.profile_pic, users.dna, users.personality_type,
-                TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age
-                FROM profile_data
-                JOIN users ON profile_data.user_id = users.id
-                WHERE users.id != ? AND users.gender IN (?)
-            `;
-      let queryParams = [user_id, lookingForArray];
+        SELECT profile_data.*, users.dob, users.gender, users.looking_for,
+        users.first_name, users.last_name, users.profile_pic, users.dna, users.personality_type,
+        TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age,
+        COALESCE(user_shortlisted.status, 0) AS shortlist_status
+        FROM profile_data
+        JOIN users ON profile_data.user_id = users.id
+        LEFT JOIN user_shortlisted 
+            ON user_shortlisted.user_id = ? 
+            AND user_shortlisted.shortlisted_user_id = users.id
+        WHERE users.id != ? 
+        AND users.gender IN (?) 
+        AND (user_shortlisted.status IS NULL OR user_shortlisted.status NOT IN (1, 2))`;
+
+      let queryParams = [user_id, user_id, lookingForArray];
 
       // Extract filter parameters
       const lastFilterData = JSON.stringify(req.query);
@@ -130,18 +127,18 @@ exports.filter_users = (req, res) => {
         query += ` AND weight <= ?`;
         queryParams.push(max_weight);
       }
-     
+
       if (body_type) {
-        let body_typeArray = body_type.split(',').map(color => color.trim());  
-        query += ` AND body_type IN (?)`;  
+        let body_typeArray = body_type.split(",").map((color) => color.trim());
+        query += ` AND body_type IN (?)`;
         queryParams.push(body_typeArray);
-    }
-     
+      }
+
       if (ethnicity) {
-        let ethnicityArray = ethnicity.split(',').map(color => color.trim());  
-        query += ` AND ethnicity IN (?)`;  
+        let ethnicityArray = ethnicity.split(",").map((color) => color.trim());
+        query += ` AND ethnicity IN (?)`;
         queryParams.push(ethnicityArray);
-    }
+      }
       if (eye_color) {
         let eyeColorsArray = eye_color.split(",").map((color) => color.trim());
         query += ` AND eye_color IN (?)`;
@@ -449,7 +446,6 @@ exports.apply_last_filter = (req, res) => {
   );
 };
 
-
 const getUserDetailsWithMatch = (loggedInUser, targetUserId, callback) => {
   // Fetch the target user's profile
   conn.query(
@@ -462,15 +458,24 @@ const getUserDetailsWithMatch = (loggedInUser, targetUserId, callback) => {
     [targetUserId],
     (err, targetUserData) => {
       if (err || targetUserData.length === 0) {
-        return callback({ msg: "User not found or database error", error: err }, null);
+        return callback(
+          { msg: "User not found or database error", error: err },
+          null
+        );
       }
 
       const targetUser = targetUserData[0];
-      
-      // Calculate match percentage
-      const matchPercentage = calculateMatchPercentage(loggedInUser, targetUser);
 
-      return callback(null, { ...targetUser, match_percentage: matchPercentage });
+      // Calculate match percentage
+      const matchPercentage = calculateMatchPercentage(
+        loggedInUser,
+        targetUser
+      );
+
+      return callback(null, {
+        ...targetUser,
+        match_percentage: matchPercentage,
+      });
     }
   );
 };
@@ -480,7 +485,9 @@ exports.get_user_details = (req, res) => {
   const targetUserId = req.params.userId; // Target user from URL
 
   if (!user_id) {
-    return res.status(401).json({ msg: "Unauthorized: User ID missing from token" });
+    return res
+      .status(401)
+      .json({ msg: "Unauthorized: User ID missing from token" });
   }
 
   // Fetch logged-in user data
@@ -489,22 +496,100 @@ exports.get_user_details = (req, res) => {
     [user_id],
     (err, loggedInUserData) => {
       if (err || loggedInUserData.length === 0) {
-        return res.status(500).json({ msg: "Error fetching logged-in user profile" });
+        return res
+          .status(500)
+          .json({ msg: "Error fetching logged-in user profile" });
       }
 
       const loggedInUser = loggedInUserData[0];
 
       // Fetch target user details and calculate match percentage
-      getUserDetailsWithMatch(loggedInUser, targetUserId, (error, userDetails) => {
-        if (error) {
-          return res.status(500).json(error);
-        }
+      getUserDetailsWithMatch(
+        loggedInUser,
+        targetUserId,
+        (error, userDetails) => {
+          if (error) {
+            return res.status(500).json(error);
+          }
 
-        return res.status(200).json({
-          status: "success",
-          user: userDetails,
-        });
-      });
+          return res.status(200).json({
+            status: "success",
+            user: userDetails,
+          });
+        }
+      );
     }
   );
 };
+
+exports.getShortlistedUsers = (req, res) => {
+  const user_id = req.userId;
+
+  // Query to get all shortlisted user IDs
+  const query = `
+    SELECT shortlisted_user_id 
+    FROM user_shortlisted 
+    WHERE user_id = ?;
+  `;
+
+  conn.query(query, [user_id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ msg: "Database error", error: err });
+    }
+
+    if (results.length === 0) {
+      return res
+        .status(200)
+        .json({ msg: "No shortlisted users found", users: [] });
+    }
+
+    // Extract shortlisted user IDs
+    const shortlistedUserIds = results.map((user) => user.shortlisted_user_id);
+
+    // Fetch details of all shortlisted users
+    getMultipleUserDetails(user_id, shortlistedUserIds, (error, users) => {
+      if (error) {
+        return res
+          .status(500)
+          .json({ msg: "Error fetching shortlisted user details", error });
+      }
+
+      res.status(200).json({ msg: "Shortlisted users fetched", users });
+    });
+  });
+};
+
+const getMultipleUserDetails = (loggedInUserId, userIds, callback) => {
+  if (userIds.length === 0) return callback(null, []);
+
+  // Query to get logged-in user details
+  conn.query(`SELECT * FROM profile_data WHERE user_id = ?`, [loggedInUserId], (err, loggedInUser) => {
+    if (err) return callback(err);
+    if (!loggedInUser.length) return callback(new Error("Logged-in user not found"));
+
+    const userProfile = loggedInUser[0];
+
+    const placeholders = userIds.map(() => "?").join(",");
+    const query = `
+      SELECT pd.*, u.dob, u.gender, u.looking_for, 
+      u.first_name, u.last_name, u.profile_pic, u.dna, u.personality_type,
+      TIMESTAMPDIFF(YEAR, u.dob, CURDATE()) AS age
+      FROM profile_data pd
+      JOIN users u ON pd.user_id = u.id
+      WHERE pd.user_id IN (${placeholders});
+    `;
+
+    conn.query(query, userIds, (err, users) => {
+      if (err) return callback(err);
+
+      // Calculate match percentage using actual user data
+      const enrichedUsers = users.map((user) => ({
+        ...user,
+        matchPercentage: calculateMatchPercentage(userProfile, user),
+      }));
+
+      callback(null, enrichedUsers);
+    });
+  });
+};
+

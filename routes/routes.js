@@ -6,6 +6,7 @@ const onboardingController = require("../controllers/onboarding");
 const userProfileController = require("../controllers/userProfile");
 const userFilterController = require("../controllers/userFilter");
 const userPersonalityController = require("../controllers/userPersonality");
+const userShortlistController = require("../controllers/userShortlist");
 const { check } = require("express-validator"); // Add this import
 const fileController = require("../controllers/file.controller");
 
@@ -40,7 +41,7 @@ router.get("/edit-profile", auth.verifyToken, userProfileController.edit);
 router.put("/update-profile", auth.verifyToken, userProfileController.update);
 
 //user Filter routes
-router.get(
+router.post(
   "/filter-users",
   auth.verifyToken,
   userFilterController.filter_users
@@ -54,15 +55,23 @@ router.get("/get-user/:userId", auth.verifyToken, userFilterController.get_user_
 
 // save user personality response
 router.post(
-  "/user-personality",
-  auth.verifyToken,
+  "/user-personality/:userId",
   userPersonalityController.savePersonalityResponses
+)
+  router.get(
+    "/get-user-personality/:userId",
+    userPersonalityController.getPersonalityResponses
 );
 router.get(
-  "/get-personality-report",
-  auth.verifyToken,
+  "/get-personality-report/:userId",
   userPersonalityController.getPersonalityReport
 );
+//Shortlist route
+router.post("/shortlist", auth.verifyToken, userShortlistController.shortlistUser);
+router.get("/shortlisted", auth.verifyToken, userFilterController.getShortlistedUsers);
+router.post("/blacktlisted", auth.verifyToken, userShortlistController.blacklistUser);
+// Remove a shortlisted user
+router.delete("/remove-shortlist", auth.verifyToken, userShortlistController.removeShortlistedUser);
 
 //file upload route
 router.post("/upload", fileController.upload);

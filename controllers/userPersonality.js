@@ -6,8 +6,8 @@ const jwt = require("jsonwebtoken");
 const token_key = process.env.TOKEN_KEY;
 
 exports.savePersonalityResponses = (req, res) => {
-  const user_id = req.userId; // Get user ID from authentication middleware
-  const { question_ids, responses } = req.body; // Expecting comma-separated strings
+  const user_id = req.params.userId;
+  const { question_ids, responses } = req.body;
 
   if (!user_id || !question_ids || !responses) {
     return res.status(400).json({ msg: "Invalid request data" });
@@ -18,25 +18,12 @@ exports.savePersonalityResponses = (req, res) => {
   const responseArray = responses.split(",").map(Number);
 
   if (questionIdArray.length !== responseArray.length) {
-    return res
-      .status(400)
-      .json({ msg: "Mismatched question and response count" });
+    return res.status(400).json({ msg: "Mismatched question and response count" });
   }
 
-  // Create an array of objects [{ question_id, response }]
-  const formattedResponses = questionIdArray.map((id, index) => ({
-    question_id: id,
-    response: responseArray[index],
-  }));
-
-  // Validate each response
-  for (let response of formattedResponses) {
-    if (
-      isNaN(response.question_id) ||
-      isNaN(response.response) ||
-      response.response < 1 ||
-      response.response > 5
-    ) {
+  // Validate responses
+  for (let i = 0; i < questionIdArray.length; i++) {
+    if (isNaN(questionIdArray[i]) || isNaN(responseArray[i]) || responseArray[i] < 1 || responseArray[i] > 5) {
       return res.status(400).json({ msg: "Invalid response format" });
     }
   }
@@ -47,151 +34,253 @@ exports.savePersonalityResponses = (req, res) => {
     VALUES ? 
     ON DUPLICATE KEY UPDATE response = VALUES(response)`;
 
-  const values = formattedResponses.map(({ question_id, response }) => [
-    user_id,
-    question_id,
-    response,
-  ]);
+  const values = questionIdArray.map((id, index) => [user_id, id, responseArray[index]]);
 
   conn.query(insertQuery, [values], (err) => {
     if (err) {
       return res.status(500).json({ msg: "Database error", error: err });
     }
 
-    // Query to get the highest trait score
-    const traitScoreQuery = `
-      SELECT pq.trait, 
-             ROUND(AVG(upr.response) * (100/5), 2) AS score 
-      FROM user_personality_responses upr
-      JOIN personality_questions pq ON upr.question_id = pq.id
-      WHERE upr.user_id = ?
-      GROUP BY pq.trait;
+    // Query to get all questions and user's saved responses (even if some responses are missing)
+    const fullResponseQuery = `
+      SELECT pq.id AS question_id, 
+             pq.trait, 
+             IFNULL(upr.response, '') AS response
+      FROM personality_questions pq
+      LEFT JOIN user_personality_responses upr 
+             ON pq.id = upr.question_id AND upr.user_id = ?
+      ORDER BY pq.id;
     `;
 
-    conn.query(traitScoreQuery, [user_id], (err, result) => {
+    conn.query(fullResponseQuery, [user_id], (err, responseData) => {
       if (err) {
-        return res
-          .status(500)
-          .json({ msg: "Error fetching trait scores", error: err });
+        return res.status(500).json({ msg: "Error fetching responses", error: err });
       }
 
-      // Send response to the client first
-      res.status(200).json({ msg: "Responses updated successfully", top_trait: result });
+      // Convert responses into key-value pairs and filter out empty responses
+      const savedResponses = responseData.reduce((acc, row) => {
+        if (row.response !== "") {
+          acc[row.question_id] = String(row.response);
+        }
+        return acc;
+      }, {});
 
-      // **New Functionality: Update personality_type separately**
-      if (result.length > 0) {
-        const highestTrait = result.reduce((max, trait) =>
-          trait.score > max.score ? trait : max
-        ).trait;
+      // Get top trait score
+      const traitScoreQuery = `
+        SELECT pq.trait, 
+               ROUND(AVG(upr.response) * (100/5), 2) AS score 
+        FROM user_personality_responses upr
+        JOIN personality_questions pq ON upr.question_id = pq.id
+        WHERE upr.user_id = ?
+        GROUP BY pq.trait;
+      `;
 
-        const updateUserQuery = `UPDATE users SET personality_type = ? WHERE id = ?`;
+      conn.query(traitScoreQuery, [user_id], (err, traitResults) => {
+        if (err) {
+          return res.status(500).json({ msg: "Error fetching trait scores", error: err });
+        }
 
-        conn.query(updateUserQuery, [highestTrait, user_id], (updateErr) => {
-          if (updateErr) {
-            console.error("Error updating personality type:", updateErr);
-          }
+        // Determine the highest-scoring trait
+        let highestTrait = null;
+        if (traitResults.length > 0) {
+          highestTrait = traitResults.reduce((max, trait) => (trait.score > max.score ? trait : max)).trait;
+        }
+
+        // Update personality_type in the users table
+        if (highestTrait) {
+          const updateUserQuery = `UPDATE users SET personality_type = ? WHERE id = ?`;
+          conn.query(updateUserQuery, [highestTrait, user_id], (updateErr) => {
+            if (updateErr) {
+              console.error("Error updating personality type:", updateErr);
+            }
+          });
+        }
+
+        // Send API response
+        res.status(200).json({
+          msg: "Responses updated successfully",
+          saved_responses: savedResponses, // Only includes non-empty responses
         });
+      });
+    });
+  });
+};
+exports.getPersonalityResponses = (req, res) => {
+  const user_id = req.params.userId;
+
+  if (!user_id) {
+    return res.status(400).json({ msg: "Invalid request data" });
+  }
+
+  // Query to get all questions and user's saved responses
+  const fullResponseQuery = `
+    SELECT pq.id AS question_id, 
+           pq.trait, 
+           IFNULL(upr.response, '') AS response
+    FROM personality_questions pq
+    LEFT JOIN user_personality_responses upr 
+           ON pq.id = upr.question_id AND upr.user_id = ?
+    ORDER BY pq.id;
+  `;
+
+  conn.query(fullResponseQuery, [user_id], (err, responseData) => {
+    if (err) {
+      return res.status(500).json({ msg: "Error fetching responses", error: err });
+    }
+
+    // Convert responses into key-value pairs and filter out empty responses
+    const savedResponses = responseData.reduce((acc, row) => {
+      if (row.response !== "") {
+        acc[row.question_id] = String(row.response);
       }
+      return acc;
+    }, {});
+
+    // Send API response
+    res.status(200).json({
+      msg: "Responses fetched successfully",
+      saved_responses: savedResponses, // Only includes non-empty responses
     });
   });
 };
 
 
+
+
 exports.getPersonalityReport = (req, res) => {
-  const user_id = req.userId;
+  const user_id = req.params.userId;
 
   if (!user_id) {
     return res.status(400).json({ msg: "User ID is required" });
   }
 
-  // Fetch personality trait scores
-  const traitScoreQuery = `
-    WITH trait_scores AS (
-      SELECT pq.trait, 
-             ROUND(AVG(upr.response) * (100/5), 2) AS score 
-      FROM user_personality_responses upr
-      JOIN personality_questions pq ON upr.question_id = pq.id
-      WHERE upr.user_id = ?
-      GROUP BY pq.trait
-    )
-    SELECT trait, score FROM trait_scores;
+  // Fetch user details along with personality trait scores
+  const userQuery = `
+    SELECT first_name, last_name FROM users WHERE id = ?;
   `;
 
-  conn.query(traitScoreQuery, [user_id], (err, traits) => {
+  conn.query(userQuery, [user_id], (err, userResult) => {
     if (err) {
       return res.status(500).json({ msg: "Database error", error: err });
     }
 
-    // Sort traits in descending order by score
-    traits.sort((a, b) => b.score - a.score);
+    if (userResult.length === 0) {
+      return res.status(404).json({ msg: "User not found" });
+    }
 
-    // Select the top 2-3 traits
-    const topTraits = traits.slice(0, 3);
+    const { first_name, last_name } = userResult[0];
 
-    // Generate dynamic personality patterns based on top traits
-    const personalityPatterns = generatePersonalityPatterns(topTraits);
+    // Fetch personality trait scores
+    const traitScoreQuery = `
+      WITH trait_scores AS (
+        SELECT pq.trait, 
+               ROUND(AVG(upr.response) * (100/5), 2) AS score 
+        FROM user_personality_responses upr
+        JOIN personality_questions pq ON upr.question_id = pq.id
+        WHERE upr.user_id = ?
+        GROUP BY pq.trait
+      )
+      SELECT trait, score FROM trait_scores;
+    `;
 
-    res.status(200).json({
-      msg: "Personality report generated",
-      traits,
-      personalityPatterns,
-      summary: generatePersonalitySummary(topTraits),
+    conn.query(traitScoreQuery, [user_id], (err, traits) => {
+      if (err) {
+        return res.status(500).json({ msg: "Database error", error: err });
+      }
+
+      // Sort traits in descending order by score
+      traits.sort((a, b) => b.score - a.score);
+
+      // Select the top 4 traits
+      const topTraits = traits.slice(0, 5);
+
+      // Generate dynamic personality patterns based on top traits
+      const personalityPatterns = generatePersonalityPatterns(topTraits);
+
+      res.status(200).json({
+        msg: "Personality report generated",
+        user: {
+          id: user_id,
+          first_name,
+          last_name,
+        },
+        traits,
+        personalityPatterns,
+        summary: generatePersonalitySummary(topTraits),
+      });
     });
   });
 };
 
-const generatePersonalityPatterns = (topTraits) => {
-  const patterns = [];
 
+const generatePersonalityPatterns = (topTraits) => {
+  let analyticalThinker = 0;
+  let empathicIdealist = 0;
+  let logicalMechanic = 0;
+  let practicalCaretaker = 0;
+
+  // Assign raw scores
   topTraits.forEach((trait) => {
     switch (trait.trait) {
       case "Openness":
-        patterns.push({
-          name: "Creative Explorer",
-          description: "You are highly imaginative and open to new ideas.",
-          score: trait.score,
-        });
-        break;
-
-      case "Conscientiousness":
-        patterns.push({
-          name: "Organized Achiever",
-          description: "You are disciplined and work efficiently toward goals.",
-          score: trait.score,
-        });
-        break;
-
-      case "Extraversion":
-        patterns.push({
-          name: "Social Enthusiast",
-          description:
-            "You enjoy social interactions and engaging with people.",
-          score: trait.score,
-        });
+        analyticalThinker = trait.score;
         break;
 
       case "Agreeableness":
-        patterns.push({
-          name: "Compassionate Helper",
-          description:
-            "You are kind, cooperative, and empathetic towards others.",
-          score: trait.score,
-        });
+        empathicIdealist = trait.score;
         break;
 
       case "Neuroticism":
-        patterns.push({
-          name: "Sensitive Thinker",
-          description:
-            "You experience emotions deeply and are highly self-aware.",
-          score: trait.score,
-        });
+        logicalMechanic = trait.score;
+        break;
+
+      case "Extraversion":
+        practicalCaretaker = trait.score;
         break;
     }
   });
 
+  // Normalize Group 1 (Analytical Thinker + Empathic Idealist)
+  let group1Total = analyticalThinker + empathicIdealist;
+  if (group1Total > 0) {
+    analyticalThinker = (analyticalThinker / group1Total) * 100;
+    empathicIdealist = (empathicIdealist / group1Total) * 100;
+  }
+
+  // Normalize Group 2 (Logical Mechanic + Practical Caretaker)
+  let group2Total = logicalMechanic + practicalCaretaker;
+  if (group2Total > 0) {
+    logicalMechanic = (logicalMechanic / group2Total) * 100;
+    practicalCaretaker = (practicalCaretaker / group2Total) * 100;
+  }
+
+  // Construct the response
+  const patterns = [
+    {
+      name: "Analytical Thinker",
+      description: "Solves logical problems with rational, complex analysis.",
+      score: parseFloat(analyticalThinker.toFixed(2)),
+    },
+    {
+      name: "Empathic Idealist",
+      description: "Uses insight and creativity to help others.",
+      score: parseFloat(empathicIdealist.toFixed(2)),
+    },
+    {
+      name: "Logical Mechanic",
+      description: "Ensures accuracy and efficiency in logical systems.",
+      score: parseFloat(logicalMechanic.toFixed(2)),
+    },
+    {
+      name: "Practical Caretaker",
+      description: "Helps other people in practical, everyday ways.",
+      score: parseFloat(practicalCaretaker.toFixed(2)),
+    },
+  ];
+
   return patterns;
 };
+
 const generatePersonalitySummary = (topTraits) => {
   // Trait descriptions for better storytelling
   const traitDescriptions = {
