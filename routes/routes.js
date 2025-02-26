@@ -7,6 +7,7 @@ const userProfileController = require("../controllers/userProfile");
 const userFilterController = require("../controllers/userFilter");
 const userPersonalityController = require("../controllers/userPersonality");
 const userShortlistController = require("../controllers/userShortlist");
+const userMaybelistController = require("../controllers/maybeList");
 const { check } = require("express-validator"); // Add this import
 const fileController = require("../controllers/file.controller");
 
@@ -69,9 +70,11 @@ router.get(
 //Shortlist route
 router.post("/shortlist", auth.verifyToken, userShortlistController.shortlistUser);
 router.get("/shortlisted", auth.verifyToken, userFilterController.getShortlistedUsers);
-router.post("/blacktlisted", auth.verifyToken, userShortlistController.blacklistUser);
+router.post("/add-maybe", auth.verifyToken, userMaybelistController.maybeUser);
+router.get("/maybe", auth.verifyToken, userFilterController.getMaybeUsers);
+router.delete("/blacktlisted", auth.verifyToken, userShortlistController.blacklistUser);
 // Remove a shortlisted user
-router.delete("/remove-shortlist", auth.verifyToken, userShortlistController.removeShortlistedUser);
+router.delete("/remove-maybe", auth.verifyToken, userMaybelistController.removeMaybeUser);
 
 //file upload route
 router.post("/upload", fileController.upload);

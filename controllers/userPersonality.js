@@ -145,8 +145,6 @@ exports.getPersonalityResponses = (req, res) => {
 };
 
 
-
-
 exports.getPersonalityReport = (req, res) => {
   const user_id = req.params.userId;
 

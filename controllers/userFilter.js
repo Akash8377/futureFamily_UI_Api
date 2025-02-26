@@ -525,12 +525,11 @@ exports.get_user_details = (req, res) => {
 exports.getShortlistedUsers = (req, res) => {
   const user_id = req.userId;
 
-  // Query to get all shortlisted user IDs
   const query = `
-    SELECT shortlisted_user_id 
-    FROM user_shortlisted 
-    WHERE user_id = ?;
-  `;
+  SELECT shortlisted_user_id 
+  FROM user_shortlisted 
+  WHERE user_id = ? AND status = 1;
+`;
 
   conn.query(query, [user_id], (err, results) => {
     if (err) {
@@ -555,6 +554,41 @@ exports.getShortlistedUsers = (req, res) => {
       }
 
       res.status(200).json({ msg: "Shortlisted users fetched", users });
+    });
+  });
+};
+exports.getMaybeUsers = (req, res) => {
+  const user_id = req.userId;
+
+  const query = `
+  SELECT maybe_user_id 
+  FROM user_maybe 
+  WHERE user_id = ? AND status = 1;
+`;
+
+  conn.query(query, [user_id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ msg: "Database error", error: err });
+    }
+
+    if (results.length === 0) {
+      return res
+        .status(200)
+        .json({ msg: "No maybe users found", users: [] });
+    }
+
+    // Extract maybe user IDs
+    const maybeUserIds = results.map((user) => user.maybe_user_id);
+
+    // Fetch details of all maybe users
+    getMultipleUserDetails(user_id, maybeUserIds, (error, users) => {
+      if (error) {
+        return res
+          .status(500)
+          .json({ msg: "Error fetching maybe user details", error });
+      }
+
+      res.status(200).json({ msg: "Maybe users fetched", users });
     });
   });
 };
