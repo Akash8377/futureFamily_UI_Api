@@ -10,6 +10,7 @@ const userShortlistController = require("../controllers/userShortlist");
 const userMaybelistController = require("../controllers/maybeList");
 const { check } = require("express-validator"); // Add this import
 const fileController = require("../controllers/file.controller");
+const messageListingController = require("../controllers/messageListingController");
 
 const {
   loginUpValidataion,
@@ -80,8 +81,12 @@ router.get("/maybe", auth.verifyToken, userFilterController.getMaybeUsers);
 router.delete("/blacktlisted", auth.verifyToken, userShortlistController.blacklistUser);
 // Remove a shortlisted user
 router.delete("/remove-maybe", auth.verifyToken, userMaybelistController.removeMaybeUser);
+router.delete("/remove-shortlist", auth.verifyToken, userShortlistController.removeShortlistedUser);
 
 //file upload route
 router.post("/upload", fileController.upload);
+
+//message-listing 
+router.get("/message-listing", auth.verifyToken, messageListingController.getMessageListing);
 
 module.exports = router; // export to use in server.js

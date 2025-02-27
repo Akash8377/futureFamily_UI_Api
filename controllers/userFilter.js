@@ -548,7 +548,15 @@ exports.getShortlistedUsers = (req, res) => {
       users.personality_type
     FROM user_shortlisted
     JOIN users ON user_shortlisted.shortlisted_user_id = users.id
-    WHERE user_shortlisted.user_id = ? AND user_shortlisted.status = 1;
+    WHERE user_shortlisted.user_id = ? 
+      AND user_shortlisted.status = 1
+      AND NOT EXISTS (
+        SELECT 1
+        FROM user_shortlisted us2
+        WHERE us2.user_id = user_shortlisted.shortlisted_user_id
+          AND us2.shortlisted_user_id = user_shortlisted.user_id
+          AND us2.status = 1
+      );
   `;
 
   conn.query(query, [user_id], (err, results) => {
@@ -604,7 +612,18 @@ exports.getNotificationsUsers = (req, res) => {
       users.personality_type
     FROM notifications
     JOIN users ON notifications.notifications_user_id = users.id
-    WHERE notifications.user_id = ?;
+    WHERE notifications.user_id = ?
+      AND NOT EXISTS (
+        SELECT 1
+        FROM user_shortlisted us1
+        JOIN user_shortlisted us2
+          ON us1.user_id = us2.shortlisted_user_id
+          AND us1.shortlisted_user_id = us2.user_id
+        WHERE us1.user_id = notifications.user_id
+          AND us1.shortlisted_user_id = notifications.notifications_user_id
+          AND us1.status = 1
+          AND us2.status = 1
+      );
   `;
 
   conn.query(query, [user_id], (err, results) => {
@@ -637,7 +656,7 @@ exports.getNotificationsUsers = (req, res) => {
           full_name: notificationUser.first_name + " " + notificationUser.last_name,
           profile_pic: notificationUser.profile_pic,
           age: calculateAge(notificationUser.dob), // Calculate age from DOB
-          gender:notificationUser.gender,
+          gender: notificationUser.gender,
           personality_type: notificationUser.personality_type
         };
       });
