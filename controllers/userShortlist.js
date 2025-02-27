@@ -6,27 +6,95 @@ const jwt = require("jsonwebtoken");
 const token_key = process.env.TOKEN_KEY;
 
 exports.shortlistUser = (req, res) => {
-    const user_id = req.userId; // Logged-in user ID
-    const { shortlisted_user_id, status } = req.body;
-    console.log(req.body)
-  
-    
-  
-    const query = `
-      INSERT INTO user_shortlisted (user_id, shortlisted_user_id, status)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE status = VALUES(status), updated_at = NOW();
-    `;
-  
-    conn.query(query, [user_id, shortlisted_user_id, status], (err) => {
-      if (err) {
-        return res.status(500).json({ msg: "Database error", error: err });
-      }
-      res.status(200).json({ msg: "Shortlist updated successfully" });
-    });
-  };
-  
+  const user_id = req.userId; // Logged-in user ID
+  const { shortlisted_user_id, status } = req.body;
+  console.log(req.body);
 
+  const shortlistQuery = `
+    INSERT INTO user_shortlisted (user_id, shortlisted_user_id, status)
+    VALUES (?, ?, ?)
+    ON DUPLICATE KEY UPDATE status = VALUES(status), updated_at = NOW();
+  `;
+
+  conn.query(shortlistQuery, [user_id, shortlisted_user_id, status], (err) => {
+      if (err) {
+          return res.status(500).json({ msg: "Database error", error: err });
+      }
+
+      // Fetch the full profile details of the shortlisted user
+      const profileQuery = `
+          SELECT * FROM profile_data
+          WHERE user_id = ?;
+      `;
+
+      conn.query(profileQuery, [shortlisted_user_id], (err, results) => {
+          if (err) {
+              console.error("Error fetching profile details:", err);
+              return res.status(500).json({ msg: "Database error", error: err });
+          }
+
+          if (results.length === 0) {
+              return res.status(404).json({ msg: "User profile not found" });
+          }
+
+          const profileDetails = results[0];
+
+          // Create a notification message with full profile details
+          const notificationMessage = JSON.stringify({
+              message: `You have been shortlisted by user ${user_id}`,
+              profile: profileDetails // Include full profile details
+          });
+
+          // Insert the notification into the database
+          const notificationQuery = `
+              INSERT INTO notifications (user_id, message)
+              VALUES (?, ?);
+          `;
+
+          conn.query(notificationQuery, [shortlisted_user_id, notificationMessage], (err) => {
+              if (err) {
+                  console.error("Error adding notification:", err);
+              }
+          });
+
+          res.status(200).json({ msg: "Shortlist updated successfully" });
+      });
+  });
+};
+exports.getNotifications = (req, res) => {
+  const user_id = req.userId;
+
+  const query = `
+      SELECT * FROM notifications
+      WHERE user_id = ?
+      ORDER BY created_at DESC;
+  `;
+
+  conn.query(query, [user_id], (err, results) => {
+      if (err) {
+          return res.status(500).json({ msg: "Database error", error: err });
+      }
+
+      // Parse the message field to extract profile details
+      const notifications = results.map(notification => {
+          try {
+              return {
+                  ...notification,
+                  message: JSON.parse(notification.message)
+              };
+          } catch (error) {
+              // If parsing fails, return the raw message
+              return {
+                  ...notification,
+                  message: notification.message // Fallback to plain text
+                
+              };
+          }
+      });
+
+      res.status(200).json({ notifications });
+  });
+};
 
   exports.removeShortlistedUser = (req, res) => {
     const user_id = req.userId;

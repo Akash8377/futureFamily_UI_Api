@@ -69,6 +69,11 @@ router.get(
 );
 //Shortlist route
 router.post("/shortlist", auth.verifyToken, userShortlistController.shortlistUser);
+
+router.get("/notifications", auth.verifyToken, userShortlistController.getNotifications);
+router.get("/getFullNotifications", auth.verifyToken, userFilterController.getNotificationsUsers);
+
+
 router.get("/shortlisted", auth.verifyToken, userFilterController.getShortlistedUsers);
 router.post("/add-maybe", auth.verifyToken, userMaybelistController.maybeUser);
 router.get("/maybe", auth.verifyToken, userFilterController.getMaybeUsers);

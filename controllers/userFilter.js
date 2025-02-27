@@ -4,6 +4,18 @@ const conn = require("../services/db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const token_key = process.env.TOKEN_KEY;
+const calculateAge = (dob) => {
+  const birthDate = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDifference = today.getMonth() - birthDate.getMonth();
+
+  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  return age;
+};
 
 exports.filter_users = (req, res) => {
   const errors = validationResult(req);
@@ -526,10 +538,18 @@ exports.getShortlistedUsers = (req, res) => {
   const user_id = req.userId;
 
   const query = `
-  SELECT shortlisted_user_id 
-  FROM user_shortlisted 
-  WHERE user_id = ? AND status = 1;
-`;
+    SELECT 
+      user_shortlisted.shortlisted_user_id,
+      users.first_name,
+      users.last_name,
+      users.profile_pic,
+      users.dob,
+      users.gender,
+      users.personality_type
+    FROM user_shortlisted
+    JOIN users ON user_shortlisted.shortlisted_user_id = users.id
+    WHERE user_shortlisted.user_id = ? AND user_shortlisted.status = 1;
+  `;
 
   conn.query(query, [user_id], (err, results) => {
     if (err) {
@@ -553,7 +573,76 @@ exports.getShortlistedUsers = (req, res) => {
           .json({ msg: "Error fetching shortlisted user details", error });
       }
 
-      res.status(200).json({ msg: "Shortlisted users fetched", users });
+      // Combine the fetched user details with the additional fields
+      const usersWithDetails = users.map(user => {
+        const shortlistedUser = results.find(shortlisted => shortlisted.shortlisted_user_id === user.user_id);
+        return {
+          ...user,
+          full_name: shortlistedUser.first_name + " " + shortlistedUser.last_name,
+          profile_pic: shortlistedUser.profile_pic,
+          age: calculateAge(shortlistedUser.dob), // Calculate age from DOB
+          gender: shortlistedUser.gender,
+          personality_type: shortlistedUser.personality_type
+        };
+      });
+
+      res.status(200).json({ msg: "Shortlisted users fetched", users: usersWithDetails });
+    });
+  });
+};
+exports.getNotificationsUsers = (req, res) => {
+  const user_id = req.userId;
+
+  const query = `
+    SELECT 
+      notifications.notifications_user_id,
+      users.first_name,
+      users.last_name,
+      users.profile_pic,
+      users.dob,
+      users.gender,
+      users.personality_type
+    FROM notifications
+    JOIN users ON notifications.notifications_user_id = users.id
+    WHERE notifications.user_id = ?;
+  `;
+
+  conn.query(query, [user_id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ msg: "Database error", error: err });
+    }
+
+    if (results.length === 0) {
+      return res
+        .status(200)
+        .json({ msg: "No notifications users found", users: [] });
+    }
+
+    // Extract notifications user IDs
+    const notificationsUserIds = results.map((user) => user.notifications_user_id);
+
+    // Fetch details of all notifications users
+    getMultipleUserDetails(user_id, notificationsUserIds, (error, users) => {
+      if (error) {
+        return res
+          .status(500)
+          .json({ msg: "Error fetching notifications user details", error });
+      }
+
+      // Combine the fetched user details with the additional fields
+      const usersWithDetails = users.map(user => {
+        const notificationUser = results.find(notification => notification.notifications_user_id === user.user_id);
+        return {
+          ...user,
+          full_name: notificationUser.first_name + " " + notificationUser.last_name,
+          profile_pic: notificationUser.profile_pic,
+          age: calculateAge(notificationUser.dob), // Calculate age from DOB
+          gender:notificationUser.gender,
+          personality_type: notificationUser.personality_type
+        };
+      });
+
+      res.status(200).json({ msg: "Notifications users fetched", users: usersWithDetails });
     });
   });
 };
@@ -561,10 +650,18 @@ exports.getMaybeUsers = (req, res) => {
   const user_id = req.userId;
 
   const query = `
-  SELECT maybe_user_id 
-  FROM user_maybe 
-  WHERE user_id = ? AND status = 1;
-`;
+    SELECT 
+      user_maybe.maybe_user_id,
+      users.first_name,
+      users.last_name,
+      users.profile_pic,
+      users.dob,
+      users.gender,
+      users.personality_type
+    FROM user_maybe
+    JOIN users ON user_maybe.maybe_user_id = users.id
+    WHERE user_maybe.user_id = ? AND user_maybe.status = 1;
+  `;
 
   conn.query(query, [user_id], (err, results) => {
     if (err) {
@@ -588,42 +685,45 @@ exports.getMaybeUsers = (req, res) => {
           .json({ msg: "Error fetching maybe user details", error });
       }
 
-      res.status(200).json({ msg: "Maybe users fetched", users });
+      // Combine the fetched user details with the additional fields
+      const usersWithDetails = users.map(user => {
+        const maybeUser = results.find(maybe => maybe.maybe_user_id === user.user_id);
+        return {
+          ...user,
+          full_name: maybeUser.first_name + " " + maybeUser.last_name,
+          profile_pic: maybeUser.profile_pic,
+          age: calculateAge(maybeUser.dob), // Calculate age from DOB
+          personality_type: maybeUser.personality_type,
+          gender:maybeUser.gender
+        };
+      });
+
+      res.status(200).json({ msg: "Maybe users fetched", users: usersWithDetails });
     });
   });
 };
-
 const getMultipleUserDetails = (loggedInUserId, userIds, callback) => {
-  if (userIds.length === 0) return callback(null, []);
+  if (userIds.length === 0) {
+    return callback(null, []);
+  }
 
-  // Query to get logged-in user details
-  conn.query(`SELECT * FROM profile_data WHERE user_id = ?`, [loggedInUserId], (err, loggedInUser) => {
-    if (err) return callback(err);
-    if (!loggedInUser.length) return callback(new Error("Logged-in user not found"));
-
-    const userProfile = loggedInUser[0];
-
-    const placeholders = userIds.map(() => "?").join(",");
-    const query = `
-      SELECT pd.*, u.dob, u.gender, u.looking_for, 
-      u.first_name, u.last_name, u.profile_pic, u.dna, u.personality_type,
-      TIMESTAMPDIFF(YEAR, u.dob, CURDATE()) AS age
-      FROM profile_data pd
-      JOIN users u ON pd.user_id = u.id
-      WHERE pd.user_id IN (${placeholders});
+  const query = `
+      SELECT * FROM profile_data
+      WHERE user_id IN (?);
     `;
 
-    conn.query(query, userIds, (err, users) => {
-      if (err) return callback(err);
+  conn.query(query, [userIds], (err, results) => {
+    if (err) {
+      return callback(err);
+    }
 
-      // Calculate match percentage using actual user data
-      const enrichedUsers = users.map((user) => ({
-        ...user,
-        matchPercentage: calculateMatchPercentage(userProfile, user),
-      }));
+    // Add match percentage or other custom logic if needed
+    const users = results.map(user => ({
+      ...user,
+      matchPercentage: calculateMatchPercentage(loggedInUserId, user.user_id) // Optional
+    }));
 
-      callback(null, enrichedUsers);
-    });
+    callback(null, users);
   });
 };
 
