@@ -41,52 +41,85 @@ exports.shortlistUser = (req, res) => {
 
         conn.query(insertMessageListingQuery, [user_id, shortlisted_user_id], (err) => {
           if (err) {
-            return res.status(500).json({ msg: "Database error", error: err });
+            console.error("Error adding to message_listing:", err);
+            // Do not send a response here, just log the error
           }
         });
       }
 
-      // Fetch the full profile details of the shortlisted user
-      const profileQuery = `
+      // Fetch the full profile details of the logged-in user (who performed the shortlisting)
+      const loggedInUserQuery = `
         SELECT * FROM profile_data
         WHERE user_id = ?;
       `;
 
-      conn.query(profileQuery, [shortlisted_user_id], (err, results) => {
+      conn.query(loggedInUserQuery, [user_id], (err, loggedInUserResults) => {
         if (err) {
-          console.error("Error fetching profile details:", err);
+          console.error("Error fetching logged-in user profile details:", err);
           return res.status(500).json({ msg: "Database error", error: err });
         }
 
-        if (results.length === 0) {
-          return res.status(404).json({ msg: "User profile not found" });
+        if (loggedInUserResults.length === 0) {
+          return res.status(404).json({ msg: "Logged-in user profile not found" });
         }
 
-        const profileDetails = results[0];
+        const loggedInUser = loggedInUserResults[0];
 
-        // Create a notification message with full profile details
-        const notificationMessage = JSON.stringify({
-          message: `You have been shortlisted by user ${user_id}`,
-          profile: profileDetails // Include full profile details
-        });
-
-        // Insert the notification into the database
-        const notificationQuery = `
-          INSERT INTO notifications (user_id, notifications_user_id, message)
-          VALUES (?, ?, ?);
+        // Fetch the full profile details of the shortlisted user
+        const profileQuery = `
+          SELECT * FROM profile_data
+          WHERE user_id = ?;
         `;
 
-        conn.query(
-          notificationQuery,
-          [shortlisted_user_id, user_id, notificationMessage], // Set notifications_user_id to the logged-in user's ID
-          (err) => {
-            if (err) {
-              console.error("Error adding notification:", err);
-            }
+        conn.query(profileQuery, [shortlisted_user_id], (err, results) => {
+          if (err) {
+            console.error("Error fetching shortlisted user profile details:", err);
+            return res.status(500).json({ msg: "Database error", error: err });
           }
-        );
 
-        res.status(200).json({ msg: "Shortlist updated successfully" });
+          if (results.length === 0) {
+            return res.status(404).json({ msg: "Shortlisted user profile not found" });
+          }
+
+          const shortlistedUser = results[0];
+
+          // Create a notification message with details of both users
+          const notificationMessage = JSON.stringify({
+            message: `You have been shortlisted by ${loggedInUser.first_name} ${loggedInUser.last_name}`,
+            shortlisted_by: {
+              user_id: loggedInUser.user_id,
+              first_name: loggedInUser.first_name,
+              last_name: loggedInUser.last_name,
+              profile_pic: loggedInUser.profile_pic,
+            },
+            shortlisted_user: {
+              user_id: shortlistedUser.user_id,
+              first_name: shortlistedUser.first_name,
+              last_name: shortlistedUser.last_name,
+              profile_pic: shortlistedUser.profile_pic,
+            },
+          });
+
+          // Insert the notification into the database
+          const notificationQuery = `
+            INSERT INTO notifications (user_id, notifications_user_id, message)
+            VALUES (?, ?, ?);
+          `;
+
+          conn.query(
+            notificationQuery,
+            [shortlisted_user_id, user_id, notificationMessage], // Set notifications_user_id to the logged-in user's ID
+            (err) => {
+              if (err) {
+                console.error("Error adding notification:", err);
+                // Do not send a response here, just log the error
+              }
+
+              // Send success response
+              return res.status(200).json({ msg: "Shortlist updated successfully" });
+            }
+          );
+        });
       });
     });
   });
@@ -116,8 +149,9 @@ exports.getNotifications = (req, res) => {
               // If parsing fails, return the raw message
               return {
                   ...notification,
-                  message: notification.message // Fallback to plain text
-                
+                  message: {
+                      message: notification.message // Fallback to plain text
+                  }
               };
           }
       });

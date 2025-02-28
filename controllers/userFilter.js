@@ -64,9 +64,16 @@ exports.filter_users = (req, res) => {
             AND user_shortlisted.shortlisted_user_id = users.id
         WHERE users.id != ? 
         AND users.gender IN (?) 
-        AND (user_shortlisted.status IS NULL OR user_shortlisted.status NOT IN (1, 2))`;
+        AND (user_shortlisted.status IS NULL OR user_shortlisted.status NOT IN (1, 2))
+        AND NOT EXISTS (
+          SELECT 1
+          FROM user_maybe
+          WHERE user_maybe.user_id = ?
+            AND user_maybe.maybe_user_id = users.id
+            AND user_maybe.status = 3
+        )`;
 
-      let queryParams = [user_id, user_id, lookingForArray];
+      let queryParams = [user_id, user_id, lookingForArray, user_id];
 
       // Extract filter parameters
       const lastFilterData = JSON.stringify(req.query);
@@ -552,10 +559,10 @@ exports.getShortlistedUsers = (req, res) => {
       AND user_shortlisted.status = 1
       AND NOT EXISTS (
         SELECT 1
-        FROM user_shortlisted us2
-        WHERE us2.user_id = user_shortlisted.shortlisted_user_id
-          AND us2.shortlisted_user_id = user_shortlisted.user_id
-          AND us2.status = 1
+        FROM user_maybe
+        WHERE user_maybe.user_id = user_shortlisted.user_id
+          AND user_maybe.maybe_user_id = user_shortlisted.shortlisted_user_id
+          AND user_maybe.status = 3
       );
   `;
 
@@ -676,10 +683,21 @@ exports.getMaybeUsers = (req, res) => {
       users.profile_pic,
       users.dob,
       users.gender,
-      users.personality_type
+      users.personality_type,
+      user_maybe.status,
+      user_maybe.created_at,
+      user_maybe.updated_at
     FROM user_maybe
     JOIN users ON user_maybe.maybe_user_id = users.id
-    WHERE user_maybe.user_id = ? AND user_maybe.status = 1;
+    WHERE user_maybe.user_id = ? 
+      AND user_maybe.status = 3
+      AND NOT EXISTS (
+        SELECT 1
+        FROM user_shortlisted
+        WHERE user_shortlisted.user_id = user_maybe.user_id
+          AND user_shortlisted.shortlisted_user_id = user_maybe.maybe_user_id
+          AND user_shortlisted.status = 1
+      );
   `;
 
   conn.query(query, [user_id], (err, results) => {
@@ -690,7 +708,7 @@ exports.getMaybeUsers = (req, res) => {
     if (results.length === 0) {
       return res
         .status(200)
-        .json({ msg: "No maybe users found", users: [] });
+        .json({ msg: "No maybe users found with status 3 (excluding shortlisted users)", users: [] });
     }
 
     // Extract maybe user IDs
@@ -705,19 +723,22 @@ exports.getMaybeUsers = (req, res) => {
       }
 
       // Combine the fetched user details with the additional fields
-      const usersWithDetails = users.map(user => {
-        const maybeUser = results.find(maybe => maybe.maybe_user_id === user.user_id);
+      const usersWithDetails = results.map((maybeUser) => {
+        const userDetails = users.find((user) => user.user_id === maybeUser.maybe_user_id);
         return {
-          ...user,
+          ...userDetails,
           full_name: maybeUser.first_name + " " + maybeUser.last_name,
           profile_pic: maybeUser.profile_pic,
           age: calculateAge(maybeUser.dob), // Calculate age from DOB
           personality_type: maybeUser.personality_type,
-          gender:maybeUser.gender
+          gender: maybeUser.gender,
+          status: maybeUser.status,
+          created_at: maybeUser.created_at,
+          updated_at: maybeUser.updated_at
         };
       });
 
-      res.status(200).json({ msg: "Maybe users fetched", users: usersWithDetails });
+      res.status(200).json({ msg: "Maybe users with status 3 (excluding shortlisted users) fetched", users: usersWithDetails });
     });
   });
 };

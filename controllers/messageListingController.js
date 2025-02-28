@@ -18,7 +18,9 @@ exports.getMessageListing = (req, res) => {
       ON us1.user_id = us2.shortlisted_user_id 
       AND us1.shortlisted_user_id = us2.user_id
     JOIN users ON us1.shortlisted_user_id = users.id
-    WHERE us1.user_id = ? AND us1.status = 1 AND us2.status = 1;
+    WHERE us1.user_id = ? 
+      AND us1.status = 1 
+      AND us2.status = 1;
   `;
 
   conn.query(query, [user_id], (err, results) => {

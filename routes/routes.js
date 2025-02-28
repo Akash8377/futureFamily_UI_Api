@@ -89,4 +89,4 @@ router.post("/upload", fileController.upload);
 //message-listing 
 router.get("/message-listing", auth.verifyToken, messageListingController.getMessageListing);
 
-module.exports = router; // export to use in server.js
+module.exports = router; 
