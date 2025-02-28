@@ -559,6 +559,13 @@ exports.getShortlistedUsers = (req, res) => {
       AND user_shortlisted.status = 1
       AND NOT EXISTS (
         SELECT 1
+        FROM user_shortlisted us2
+        WHERE us2.user_id = user_shortlisted.shortlisted_user_id
+          AND us2.shortlisted_user_id = user_shortlisted.user_id
+          AND us2.status = 1
+      )
+      AND NOT EXISTS (
+        SELECT 1
         FROM user_maybe
         WHERE user_maybe.user_id = user_shortlisted.user_id
           AND user_maybe.maybe_user_id = user_shortlisted.shortlisted_user_id
