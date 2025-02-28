@@ -70,6 +70,7 @@ router.get(
 );
 //Shortlist route
 router.post("/shortlist", auth.verifyToken, userShortlistController.shortlistUser);
+router.post("/may-be-shortlist", auth.verifyToken, userShortlistController.shortlistMaybeUser);
 
 router.get("/notifications", auth.verifyToken, userShortlistController.getNotifications);
 router.get("/getFullNotifications", auth.verifyToken, userFilterController.getNotificationsUsers);
