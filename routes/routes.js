@@ -11,6 +11,8 @@ const userMaybelistController = require("../controllers/maybeList");
 const { check } = require("express-validator"); // Add this import
 const fileController = require("../controllers/file.controller");
 const messageListingController = require("../controllers/messageListingController");
+const chatController = require("../controllers/chatController");
+
 
 const {
   loginUpValidataion,
@@ -89,5 +91,11 @@ router.post("/upload", fileController.upload);
 
 //message-listing 
 router.get("/message-listing", auth.verifyToken, messageListingController.getMessageListing);
+
+//chat-inbox
+router.post("/send-message", auth.verifyToken, chatController.sendMessage);
+router.post("/send-photo", auth.verifyToken, chatController.sendPhoto);
+router.get("/chat-history/:other_user_id", auth.verifyToken, chatController.getChatHistory);
+
 
 module.exports = router; 
