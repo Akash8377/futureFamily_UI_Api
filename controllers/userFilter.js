@@ -104,6 +104,9 @@ exports.filter_users = (req, res) => {
         blood_type,
         family_history_of_genetic_disorders,
         genetic_testing_results,
+        biological_attraction,
+        psychological_compatibility,
+        birth_defects,
         reproductive_health,
         known_genetic_predispositions,
         hormonal_profile,
@@ -152,7 +155,27 @@ exports.filter_users = (req, res) => {
         query += ` AND body_type IN (?)`;
         queryParams.push(body_typeArray);
       }
-
+      if (importance_of_family) {
+        let importance_of_familyArray = importance_of_family.split(",").map((color) => color.trim());
+        query += ` AND importance_of_family IN (?)`;
+        queryParams.push(importance_of_familyArray);
+      }
+      if (biological_attraction) {
+        let biological_attractionArray = biological_attraction.split(",").map((color) => color.trim());
+        query += ` AND biological_attraction IN (?)`;
+        queryParams.push(biological_attractionArray);
+      }
+      if (psychological_compatibility) {
+        let psychological_compatibilityArray = psychological_compatibility.split(",").map((color) => color.trim());
+        query += ` AND psychological_compatibility IN (?)`;
+        queryParams.push(psychological_compatibilityArray);
+      }
+      if (birth_defects) {
+        let birth_defectsArray = birth_defects.split(",").map((color) => color.trim());
+        query += ` AND birth_defects IN (?)`;
+        queryParams.push(birth_defectsArray);
+      }
+    
       if (ethnicity) {
         let ethnicityArray = ethnicity.split(",").map((color) => color.trim());
         query += ` AND ethnicity IN (?)`;
@@ -181,6 +204,28 @@ exports.filter_users = (req, res) => {
       if (genetic_testing_results) {
         query += ` AND genetic_testing_results = ?`;
         queryParams.push(genetic_testing_results);
+      }
+      if (genetic_testing_results) {
+        query += ` AND genetic_testing_results = ?`;
+        queryParams.push(genetic_testing_results);
+      }
+      if (genetic_testing_results) {
+        query += ` AND genetic_testing_results = ?`;
+        queryParams.push(genetic_testing_results);
+      }
+      
+      if (biological_attraction) {
+        query += ` AND biological_attraction = ?`;
+        queryParams.push(biological_attraction);
+      }
+    
+      if (psychological_compatibility) {
+        query += ` AND psychological_compatibility = ?`;
+        queryParams.push(psychological_compatibility);
+      }
+      if (birth_defects) {
+        query += ` AND birth_defects = ?`;
+        queryParams.push(birth_defects);
       }
       if (reproductive_health) {
         query += ` AND reproductive_health = ?`;

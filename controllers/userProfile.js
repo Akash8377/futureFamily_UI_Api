@@ -26,6 +26,9 @@ exports.add_user_profile = (req, res) => {
     blood_type,
     family_history_of_genetic_disorders,
     genetic_testing_results,
+    biological_attraction,
+    psychological_compatibility,
+    birth_defects, 
     reproductive_health,
     known_genetic_predispositions,
     hormonal_profile,
@@ -75,14 +78,15 @@ exports.add_user_profile = (req, res) => {
       const query = `
         INSERT INTO profile_data 
           (user_id, height, weight, body_type, ethnicity, eye_color, hair_color, blood_type,
-          family_history_of_genetic_disorders, genetic_testing_results, reproductive_health,
+          family_history_of_genetic_disorders, genetic_testing_results,biological_attraction,psychological_compatibility
+,birth_defects, reproductive_health,
           known_genetic_predispositions, hormonal_profile, energy_levels, diet, exercise_level,
           fertility_history, attachment_style, conflict_resolution_style, risk_tolerance,
           sense_of_humor, stress_handling, work_life_balance, social_preferences, 
           preferred_environment, importance_of_travel, want_children, number_of_children,
           parenting_style, career_goals, cultural_or_religious_beliefs, family_dynamics,
           relationship_with_parents, importance_of_family, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
 
       const values = [
@@ -96,6 +100,9 @@ exports.add_user_profile = (req, res) => {
         blood_type,
         family_history_of_genetic_disorders,
         genetic_testing_results,
+        biological_attraction,
+        psychological_compatibility,
+        birth_defects,
         reproductive_health,
         known_genetic_predispositions,
         hormonal_profile,
@@ -212,6 +219,9 @@ exports.update = (req, res) => {
     blood_type,
     family_history_of_genetic_disorders,
     genetic_testing_results,
+    biological_attraction,
+    psychological_compatibility,
+    birth_defects,
     reproductive_health,
     known_genetic_predispositions,
     hormonal_profile,
@@ -305,6 +315,9 @@ exports.update = (req, res) => {
         blood_type,
         family_history_of_genetic_disorders,
         genetic_testing_results,
+        biological_attraction,
+        psychological_compatibility,
+        birth_defects,
         reproductive_health,
         known_genetic_predispositions,
         hormonal_profile,

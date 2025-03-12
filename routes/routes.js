@@ -12,6 +12,8 @@ const { check } = require("express-validator"); // Add this import
 const fileController = require("../controllers/file.controller");
 const messageListingController = require("../controllers/messageListingController");
 const chatController = require("../controllers/chatController");
+const geneticMarkersController = require("../controllers/geneticMarkersController");
+const dnaMatch = require("../controllers/dnaMatching");
 
 
 const {
@@ -96,6 +98,13 @@ router.get("/message-listing", auth.verifyToken, messageListingController.getMes
 router.post("/send-message", auth.verifyToken, chatController.sendMessage);
 router.post("/send-photo", auth.verifyToken, chatController.sendPhoto);
 router.get("/chat-history/:other_user_id", auth.verifyToken, chatController.getChatHistory);
+router.post("/send-audio", auth.verifyToken, chatController.sendAudio);
+router.post("/save-genetic-markers",auth.verifyToken, geneticMarkersController.saveGeneticMarkers);
+ router.get("/get-genetic-markers",auth.verifyToken, geneticMarkersController.getGeneticMarkers);
+ router.get("/genetic-markers/:user_id", geneticMarkersController.getGeneticMarkersByUserId);
 
+
+ //dna-list 
+ router.get("/dna-list", auth.verifyToken, dnaMatch.getDnaMatch);
 
 module.exports = router; 

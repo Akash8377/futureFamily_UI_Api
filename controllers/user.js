@@ -4,6 +4,22 @@ const conn = require("../services/db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const token_key = process.env.TOKEN_KEY;
+const updateLastSeen = (userId) => {
+  const query = `UPDATE users SET last_seen = NOW() WHERE id = ?`;
+  conn.query(query, [userId], (err) => {
+    if (err) {
+      console.error("Error updating last_seen:", err);
+    }
+  });
+};
+
+// Helper function to check if user is online
+const isUserOnline = (lastSeen) => {
+  const now = new Date();
+  const lastSeenTime = new Date(lastSeen);
+  const minutesSinceLastSeen = (now - lastSeenTime) / (1000 * 60); // Convert to minutes
+  return minutesSinceLastSeen <= 5; // User is online if last seen within 5 minutes
+};
 
 // Signup Function
 // exports.signup = (req, res) => {
@@ -142,61 +158,51 @@ exports.signup = (req, res) => {
   );
 };
 // Login function User login
-
 exports.getUserLogin = (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).send({ errors: errors.array() });
   }
-  conn.query(
-    `SELECT * FROM users WHERE email = ${conn.escape(req.body.email)}`,
-    (err, result) => {
-      if (err) {
-        return res.status(400).send({
-          msg: err,
-        });
-      }
-      if (!result.length) {
-        return res.status(400).send({
-          msg: "Email or Password is incorrect!",
-        });
-      }
-      bcrypt.compare(
-        req.body.password,
-        result[0]["password"],
-        (bErr, bresult) => {
-          if (bErr) {
-            return res.status(400).send({
-              msg: bErr,
-            });
-          }
-          if (bresult) {
-            const token = jwt.sign({ id: result[0]["id"] }, token_key, {
-              expiresIn: "1h",
-            });
 
-            res.status(200).send({
-              status: "success",
-              token,
-              length: result?.length,
-              data: result,
-            });
-          } else {
-            return res.status(400).send({
-              msg: "Email or Password is incorrect!",
-            });
-          }
-        }
-      );
+  conn.query(`SELECT * FROM users WHERE email = ${conn.escape(req.body.email)}`, (err, result) => {
+    if (err) {
+      return res.status(400).send({ msg: err });
     }
-  );
+    if (!result.length) {
+      return res.status(400).send({ msg: "Email or Password is incorrect!" });
+    }
+
+    bcrypt.compare(req.body.password, result[0]["password"], (bErr, bresult) => {
+      if (bErr) {
+        return res.status(400).send({ msg: bErr });
+      }
+      if (bresult) {
+        const token = jwt.sign({ id: result[0]["id"] }, token_key, { expiresIn: "1h" });
+
+        const updateOnlineStatusQuery = `UPDATE users SET online = TRUE, last_seen = NOW() WHERE id = ?`;
+        conn.query(updateOnlineStatusQuery, [result[0]["id"]], (updateErr) => {
+          if (updateErr) {
+            console.error("Error updating online status:", updateErr);
+          }
+        });
+
+        res.status(200).send({
+          status: "success",
+          token,
+          length: result?.length,
+          data: result,
+        });
+      } else {
+        return res.status(400).send({ msg: "Email or Password is incorrect!" });
+      }
+    });
+  });
 };
 
 
-// Login function get login
 
 exports.getLogin = (req, res) => {
-  const userId = req.userId; // Get user ID from middleware
+  const userId = req.userId;
 
   if (!userId) {
     return res.status(401).send({ msg: "Unauthorized" });
@@ -211,16 +217,28 @@ exports.getLogin = (req, res) => {
       return res.status(404).send({ msg: "User not found" });
     }
 
+    const user = result[0];
+
+    const updateLastSeenQuery = `UPDATE users SET last_seen = NOW(), online = TRUE WHERE id = ?`;
+    conn.query(updateLastSeenQuery, [userId], (updateErr) => {
+      if (updateErr) {
+        console.error("Error updating last_seen:", updateErr);
+      }
+    });
+
+    const online = isUserOnline(user.last_seen);
+
     res.status(200).send({
       status: "success",
-      user: result[0],
+      user: {
+        ...user,
+        last_seen: user.last_seen,
+        online,
+      },
     });
   });
 };
 
-
-
-// Get login User Profile
 
 exports.welcome = (req, res) => {
   const authToken = req.headers.authorization.split(" ")[1];
@@ -239,18 +257,27 @@ exports.welcome = (req, res) => {
   );
 };
 
-// Logout Function
 
 exports.logout = (req, res) => {
-  const tokenBlacklist = new Set();
-  const token = req.headers.authorization.split(" ")[1];
+  const token = req.headers.authorization?.split(" ")[1];
   if (!token) {
     return res.status(400).send({ message: "Token is required for logout" });
   }
 
-  // Add the token to the list of revoked tokens
+  jwt.verify(token, token_key, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "Invalid token" });
+    }
 
-  tokenBlacklist.add(token);
+    const userId = decoded.id;
 
-  res.status(200).send({ message: "Logged out successfully" });
+    const updateOfflineStatusQuery = `UPDATE users SET online = FALSE WHERE id = ?`;
+    conn.query(updateOfflineStatusQuery, [userId], (updateErr) => {
+      if (updateErr) {
+        console.error("Error updating offline status:", updateErr);
+      }
+    });
+
+    res.status(200).send({ message: "Logged out successfully" });
+  });
 };
