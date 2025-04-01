@@ -5,23 +5,23 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const token_key = process.env.TOKEN_KEY;
 
-
-
 exports.saveGeneticMarkers = (req, res) => {
-  const user_id = req.userId; // Assume this comes from authentication middleware
-  const markers = req.body; // Object containing multiple key-value pairs
+  const user_id = req.userId; // Get user ID from authentication middleware
+  const markers = req.body; // Object containing gene_name: response pairs
   const values = [];
 
   if (!user_id) {
     return res.status(400).json({ msg: "User ID is required." });
   }
 
-  // Loop through markers and format them for bulk insert
   for (const [gene_name, response] of Object.entries(markers)) {
     const response_value = parseInt(response, 10);
+    
+    // Ensure response is only 0 or 1
     if (isNaN(response_value) || (response_value !== 0 && response_value !== 1)) {
       return res.status(400).json({ msg: `Invalid response value for ${gene_name}. Must be 0 or 1.` });
     }
+    
     values.push([user_id, gene_name, response_value]);
   }
 
@@ -29,26 +29,22 @@ exports.saveGeneticMarkers = (req, res) => {
     return res.status(400).json({ msg: "No valid genetic markers provided." });
   }
 
-  // Debug: Log values before executing query
-  console.log("Inserting Values:", values);
-
+  // Insert or update responses
   const query = `
     INSERT INTO genetic_markers (user_id, gene_name, response) 
-    VALUES ${values.map(() => "(?, ?, ?)").join(", ")}
+    VALUES ? 
     ON DUPLICATE KEY UPDATE response = VALUES(response), updated_at = NOW();
   `;
 
-  // Flatten values array for MySQL
-  const flattenedValues = values.flat();
-
-  conn.query(query, flattenedValues, (err) => {
+  conn.query(query, [values], (err) => {
     if (err) {
-      console.error("Database Error:", err);
       return res.status(500).json({ msg: "Database error", error: err });
     }
     res.status(200).json({ msg: "Genetic markers response saved successfully" });
   });
 };
+
+
 
 
 
@@ -84,6 +80,7 @@ exports.getGeneticMarkers = (req, res) => {
     res.status(200).json({ user_id, genetic_markers: markers });
   });
 };
+
 
 exports.getGeneticMarkersByUserId = (req, res) => {
   const { user_id } = req.params; // Get user_id from URL parameters

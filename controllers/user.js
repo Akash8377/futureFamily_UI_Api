@@ -13,7 +13,6 @@ const updateLastSeen = (userId) => {
   });
 };
 
-// Helper function to check if user is online
 const isUserOnline = (lastSeen) => {
   const now = new Date();
   const lastSeenTime = new Date(lastSeen);
@@ -21,69 +20,6 @@ const isUserOnline = (lastSeen) => {
   return minutesSinceLastSeen <= 5; // User is online if last seen within 5 minutes
 };
 
-// Signup Function
-// exports.signup = (req, res) => {
-//   // Validate user input
-//   const errors = validationResult(req);
-//   if (!errors.isEmpty()) {
-//     return res.status(400).send({ errors: errors.array() });
-//   }
-
-//   const { first_name, last_name, looking_for, gender, email, password } =
-//     req.body;
-
-//   // Check if user already exists
-//   conn.query(
-//     `SELECT * FROM users WHERE email = ${conn.escape(email)}`,
-//     (err, result) => {
-//       if (err) {
-//         return res.status(500).send({
-//           msg: "Database error",
-//           error: err,
-//         });
-//       }
-//       if (result.length) {
-//         return res.status(400).send({
-//           msg: "User already exists!",
-//         });
-//       }
-
-//       // Hash password before saving
-//       bcrypt.hash(password, 10, (hashErr, hash) => {
-//         if (hashErr) {
-//           return res.status(500).send({
-//             msg: "Error hashing password",
-//             error: hashErr,
-//           });
-//         }
-
-//         conn.query(
-//           `INSERT INTO users (first_name, last_name, gender, looking_for, email, password) VALUES (${conn.escape(
-//             first_name
-//           )}, ${conn.escape(last_name)}, ${conn.escape(gender)}, ${conn.escape(
-//             looking_for
-//           )}, ${conn.escape(email)}, ${conn.escape(hash)})`,
-//           (insertErr, insertResult) => {
-//             if (insertErr) {
-//               return res.status(500).send({
-//                 msg: "Database error",
-//                 error: insertErr,
-//               });
-//             }
-//             return res.status(201).send({
-//               status: "success",
-//               msg: "User registered successfully!",
-//               data: {
-//                 id: insertResult.insertId,
-//                 email,
-//               },
-//             });
-//           }
-//         );
-//       });
-//     }
-//   );
-// };
 exports.signup = (req, res) => {
   // Validate user input
   const errors = validationResult(req);
@@ -177,7 +113,8 @@ exports.getUserLogin = (req, res) => {
         return res.status(400).send({ msg: bErr });
       }
       if (bresult) {
-        const token = jwt.sign({ id: result[0]["id"] }, token_key, { expiresIn: "1h" });
+        // Extend token expiration to 10 hours
+        const token = jwt.sign({ id: result[0]["id"] }, token_key, { expiresIn: "10h" });
 
         const updateOnlineStatusQuery = `UPDATE users SET online = TRUE, last_seen = NOW() WHERE id = ?`;
         conn.query(updateOnlineStatusQuery, [result[0]["id"]], (updateErr) => {

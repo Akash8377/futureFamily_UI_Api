@@ -140,7 +140,6 @@ const calculateMatchPercentage = (userA, userB) => {
     const matchPercentage = (matchScore / totalWeight) * 100;
     return matchPercentage.toFixed(2);
   };
-  
   exports.getDnaMatch = (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -152,11 +151,52 @@ const calculateMatchPercentage = (userA, userB) => {
       return res.status(401).json({ msg: "Unauthorized: User ID missing from token" });
     }
   
-    // Fetch logged-in user's profile
+    console.log("Logged-in User ID:", user_id);
+  
+    const fetchGeneticMarkers = (userId) => {
+      return new Promise((resolve, reject) => {
+        const query = `
+          SELECT gm.gene_name, gm.response 
+          FROM genetic_markers gm 
+          WHERE gm.user_id = ?
+        `;
+        conn.query(query, [userId], (err, results) => {
+          if (err) {
+            reject(err);
+          } else {
+            const markers = {};
+            results.forEach((row) => {
+              markers[row.gene_name] = row.response;
+            });
+            resolve(markers);
+          }
+        });
+      });
+    };
+  
+    // First, get the list of shortlisted users
+    const getShortlistedUsers = () => {
+      return new Promise((resolve, reject) => {
+        const query = `
+          SELECT shortlisted_user_id 
+          FROM user_shortlisted 
+          WHERE user_id = ?
+        `;
+        conn.query(query, [user_id], (err, results) => {
+          if (err) {
+            reject(err);
+          } else {
+            const shortlistedIds = results.map(row => row.shortlisted_user_id);
+            resolve(shortlistedIds);
+          }
+        });
+      });
+    };
+  
     conn.query(
       `SELECT * FROM profile_data JOIN users ON profile_data.user_id = users.id WHERE user_id = ?`,
       [user_id],
-      (err, loggedInUserData) => {
+      async (err, loggedInUserData) => {
         if (err || loggedInUserData.length === 0) {
           return res.status(500).json({ msg: "Error fetching logged-in user profile" });
         }
@@ -164,7 +204,6 @@ const calculateMatchPercentage = (userA, userB) => {
         const loggedInUser = loggedInUserData[0];
         let { gender, looking_for } = loggedInUser;
   
-        // Convert `looking_for` to an array
         let lookingForArray = [];
         if (typeof looking_for === "string") {
           lookingForArray = looking_for.split(",").map(Number);
@@ -176,41 +215,174 @@ const calculateMatchPercentage = (userA, userB) => {
           return res.status(400).json({ msg: "Invalid looking_for value" });
         }
   
-        let query = `
-          SELECT profile_data.*, users.dob, users.gender, users.looking_for,
-          users.first_name, users.last_name, users.profile_pic, users.dna, users.personality_type,
-          TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age
-          FROM profile_data
-          JOIN users ON profile_data.user_id = users.id
-          WHERE users.id != ? 
-          AND users.gender IN (?)
-          AND users.looking_for IN (?)
-        `;
+        let userGeneticMarkers = {};
+        try {
+          userGeneticMarkers = await fetchGeneticMarkers(user_id);
+          console.log("Logged-in User Genetic Markers:", userGeneticMarkers);
+        } catch (err) {
+          return res.status(500).json({ msg: "Error fetching logged-in user genetic markers", error: err });
+        }
   
-        let queryParams = [user_id, lookingForArray, [gender]];
+        loggedInUser.genetic_markers = userGeneticMarkers;
   
-        // Execute the query to fetch filtered users
-        conn.query(query, queryParams, (err, results) => {
-          if (err) {
-            return res
-              .status(500)
-              .send({ msg: "Database error while filtering users", error: err });
+        try {
+          // Get the list of shortlisted user IDs
+          const shortlistedUserIds = await getShortlistedUsers();
+          
+          let query = `
+            SELECT profile_data.*, users.dob, users.gender, users.looking_for,
+            users.first_name, users.last_name, users.profile_pic, users.dna, 
+            users.personality_type, TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age, users.id as user_id
+            FROM profile_data
+            JOIN users ON profile_data.user_id = users.id
+            WHERE users.id != ? 
+            AND users.gender IN (?) 
+            AND users.looking_for IN (?)
+            ${shortlistedUserIds.length > 0 ? 'AND users.id NOT IN (?)' : ''}
+          `;
+  
+          let queryParams = [user_id, lookingForArray, [gender]];
+          if (shortlistedUserIds.length > 0) {
+            queryParams.push(shortlistedUserIds);
           }
   
-          // Calculate match percentage for each user
-          const matchedUsers = results.map((userB) => ({
-            ...userB,
-            match_percentage: calculateMatchPercentage(loggedInUser, userB),
-          }));
+          conn.query(query, queryParams, async (err, results) => {
+            if (err) {
+              return res.status(500).send({ msg: "Database error while filtering users", error: err });
+            }
   
-          // Sort users by highest match percentage
-          matchedUsers.sort((a, b) => b.match_percentage - a.match_percentage);
+            const matchedUsers = [];
+            for (const userB of results) {
+              const geneticMarkers = await fetchGeneticMarkers(userB.user_id);
+              const matchPercentage = calculateMatchPercentage(loggedInUser, userB);
   
-          return res.status(200).send({
-            status: "success",
-            users: matchedUsers,
+              // Determine flag color based on genetic compatibility
+              const flag = determineFlag(userGeneticMarkers, geneticMarkers);
+  
+              matchedUsers.push({
+                ...userB,
+                match_percentage: matchPercentage,
+                genetic_markers: geneticMarkers,
+                user_genetic: userGeneticMarkers,
+                flag,
+              });
+            }
+  
+            matchedUsers.sort((a, b) => b.match_percentage - a.match_percentage);
+  
+            return res.status(200).send({
+              status: "success",
+              loggedInUser,
+              users: matchedUsers,
+            });
           });
-        });
+        } catch (err) {
+          return res.status(500).json({ msg: "Error fetching shortlisted users", error: err });
+        }
       }
     );
   };
+
+const determineFlag = (userGeneticMarkers, geneticMarkers) => {
+  if (!userGeneticMarkers || !geneticMarkers) {
+    return "green"; // Default to green if no markers are provided
+  }
+
+  // Check if the other user (geneticMarkers) has all markers as 0
+  const allOtherMarkersZero = Object.values(geneticMarkers).every(marker => marker === 0);
+
+  if (allOtherMarkersZero) {
+    return "green"; // 🟢 No risk detected (other user has all markers as 0)
+  }
+
+  const riskConditions = {
+    "ACE": { inheritance: "Multifactorial", recommendation: "No specific match needed" },
+    "HBB": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+    "PAH": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+    "BRCA1BRCA2": { inheritance: "Autosomal dominant", recommendation: "Avoid matching, both partners should not have mutations" },  // Merged BRCA1 and BRCA2
+    "FMR1": { inheritance: "X-linked dominant", recommendation: "Avoid matching, females carrying mutations may pass the disease to offspring" },
+    "SMN1": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+    "HEXA": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+    "ATP7B": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+    "GBA": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+    "GALT": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+    "TCF7L2": { inheritance: "Multifactorial", recommendation: "Non-Matching for high-risk diabetes alleles" },
+    "ADRB2": { inheritance: "Autosomal dominant", recommendation: "Non-Matching if both partners have asthma-related variants" },
+    "HLA": { inheritance: "Multifactorial", recommendation: "Match for complementary HLA alleles" },
+    "MC1R": { inheritance: "Autosomal recessive", recommendation: "No specific match required" },
+    "EDAR": { inheritance: "Autosomal dominant", recommendation: "No specific match required" },
+    "LEP": { inheritance: "Multifactorial", recommendation: "No specific match required" },
+    "FTO": { inheritance: "Multifactorial", recommendation: "Avoid pairing both with high-risk alleles" },
+    "CLOCK": { inheritance: "Multifactorial", recommendation: "No specific match required" },
+    "APOE": { inheritance: "Autosomal dominant", recommendation: "Avoid matching with high-risk APOE4 carriers" },
+    "OXTR": { inheritance: "Multifactorial", recommendation: "Non-Matching for optimal bonding" },
+    "AVPR1A": { inheritance: "Multifactorial", recommendation: "Non-Matching for commitment traits" },
+    "SLC6A4": { inheritance: "Multifactorial", recommendation: "Non-Matching for emotional stability" },
+    "COMT": { inheritance: "Multifactorial", recommendation: "Non-Matching for stress traits" },
+    "DRD4": { inheritance: "Multifactorial", recommendation: "Non-Matching for impulsive traits" },
+    "BDNF": { inheritance: "Multifactorial", recommendation: "Non-Matching for resilience traits" },
+    "MAOA": { inheritance: "X-linked", recommendation: "Non-Matching for aggression traits" },
+    "NPY": { inheritance: "Multifactorial", recommendation: "Non-Matching for high-stress variants" },
+    "GABRA2": { inheritance: "Multifactorial", recommendation: "Non-Matching for anxiety traits" },
+    "HTR2A": { inheritance: "Multifactorial", recommendation: "Non-Matching for mood variants" }
+  };
+
+  let hasHighRisk = false;
+  let oneCarrierDetected = false;
+
+  for (const gene in geneticMarkers) {
+    if (userGeneticMarkers[gene] !== undefined) {
+      if (userGeneticMarkers[gene] === 1 && geneticMarkers[gene] === 1) {
+        // Both partners carry a mutation in a high-risk gene (e.g., HBB, PAH)
+        if (riskConditions[gene] &&
+          (riskConditions[gene].inheritance === "Autosomal recessive" ||
+            riskConditions[gene].inheritance === "Autosomal dominant")) {
+          return "red"; // 🔴 High-risk genetic match
+        }
+        hasHighRisk = true;
+      } else if (userGeneticMarkers[gene] === 1 || geneticMarkers[gene] === 1) {
+        if (riskConditions[gene] && riskConditions[gene].inheritance === "Autosomal dominant") {
+          return "red"; // 🔴 High-risk genetic match (Dominant conditions require only one mutation)
+        }
+        oneCarrierDetected = true;
+      }
+    }
+  }
+
+  if (hasHighRisk) {
+    return "red"; // 🔴 High genetic risk detected
+  }
+  if (oneCarrierDetected) {
+    return "yellow"; // 🟡 One partner is a carrier
+  }
+
+  return "green"; // 🟢 No risk detected
+};
+exports.removeDnaMatch = (req, res) => {
+  const user_id = req.userId; // Logged-in user ID
+  const { dna_match_user_id } = req.body; // User ID to remove from DNA match list
+
+  if (!dna_match_user_id) {
+      return res.status(400).json({ msg: "Invalid input data" });
+  }
+
+  // Query to remove the user from the DNA match list
+  const query = `
+      DELETE FROM user_shortlisted
+      WHERE user_id = ? AND shortlisted_user_id = ?;
+  `;
+
+  conn.query(query, [user_id, dna_match_user_id], (err) => {
+      if (err) {
+          return res.status(500).json({ msg: "Database error", error: err });
+      }
+
+      // Check if any rows were affected
+      if (conn.affectedRows === 0) {
+          return res.status(404).json({ msg: "User not found in DNA match list" });
+      }
+
+      // Success response
+      return res.status(200).json({ msg: "User removed from DNA match list" });
+  });
+};

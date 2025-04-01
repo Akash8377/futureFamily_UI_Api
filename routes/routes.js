@@ -105,6 +105,7 @@ router.post("/save-genetic-markers",auth.verifyToken, geneticMarkersController.s
 
 
  //dna-list 
+ router.delete("/remove-dna-match", auth.verifyToken, dnaMatch.removeDnaMatch);
  router.get("/dna-list", auth.verifyToken, dnaMatch.getDnaMatch);
 
 module.exports = router; 
