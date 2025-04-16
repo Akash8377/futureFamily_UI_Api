@@ -6,18 +6,22 @@ const AppError = require("./utils/appError");
 const errorHandler = require("./utils/errorHandler");
 const path = require("path");
 require("dotenv").config();
-const cors = require("cors"); // Import the cors middleware
+const cors = require("cors");
 const app = express();
 
 app.use(express.static(path.resolve("./public")));
 global.__basedir = __dirname;
-//upload globally
 app.use(cors());
-// Static Middleware
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(morgan("tiny"));
 app.use(express.urlencoded({ extended: true }));
+
+// ✅ Health check route
+app.get("/", (req, res) => {
+  res.send("API Running 🚀");
+});
+
 app.use("/", routes);
 
 app.all("*", (req, res, next) => {
@@ -26,7 +30,7 @@ app.all("*", (req, res, next) => {
 
 app.use(errorHandler);
 
-const hostname = process.env.HOST || "0.0.0.0";
+const hostname = process.env.HOST || "127.0.0.1";
 const port = process.env.PORT || 8800;
 
 app.listen(port, hostname, () => {
