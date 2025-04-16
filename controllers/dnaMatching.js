@@ -282,82 +282,95 @@ const calculateMatchPercentage = (userA, userB) => {
       }
     );
   };
-
-const determineFlag = (userGeneticMarkers, geneticMarkers) => {
-  if (!userGeneticMarkers || !geneticMarkers) {
-    return "green"; // Default to green if no markers are provided
-  }
-
-  // Check if the other user (geneticMarkers) has all markers as 0
-  const allOtherMarkersZero = Object.values(geneticMarkers).every(marker => marker === 0);
-
-  if (allOtherMarkersZero) {
-    return "green"; // 🟢 No risk detected (other user has all markers as 0)
-  }
-
-  const riskConditions = {
-    "ACE": { inheritance: "Multifactorial", recommendation: "No specific match needed" },
-    "HBB": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
-    "PAH": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
-    "BRCA1BRCA2": { inheritance: "Autosomal dominant", recommendation: "Avoid matching, both partners should not have mutations" },  // Merged BRCA1 and BRCA2
-    "FMR1": { inheritance: "X-linked dominant", recommendation: "Avoid matching, females carrying mutations may pass the disease to offspring" },
-    "SMN1": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
-    "HEXA": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
-    "ATP7B": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
-    "GBA": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
-    "GALT": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
-    "TCF7L2": { inheritance: "Multifactorial", recommendation: "Non-Matching for high-risk diabetes alleles" },
-    "ADRB2": { inheritance: "Autosomal dominant", recommendation: "Non-Matching if both partners have asthma-related variants" },
-    "HLA": { inheritance: "Multifactorial", recommendation: "Match for complementary HLA alleles" },
-    "MC1R": { inheritance: "Autosomal recessive", recommendation: "No specific match required" },
-    "EDAR": { inheritance: "Autosomal dominant", recommendation: "No specific match required" },
-    "LEP": { inheritance: "Multifactorial", recommendation: "No specific match required" },
-    "FTO": { inheritance: "Multifactorial", recommendation: "Avoid pairing both with high-risk alleles" },
-    "CLOCK": { inheritance: "Multifactorial", recommendation: "No specific match required" },
-    "APOE": { inheritance: "Autosomal dominant", recommendation: "Avoid matching with high-risk APOE4 carriers" },
-    "OXTR": { inheritance: "Multifactorial", recommendation: "Non-Matching for optimal bonding" },
-    "AVPR1A": { inheritance: "Multifactorial", recommendation: "Non-Matching for commitment traits" },
-    "SLC6A4": { inheritance: "Multifactorial", recommendation: "Non-Matching for emotional stability" },
-    "COMT": { inheritance: "Multifactorial", recommendation: "Non-Matching for stress traits" },
-    "DRD4": { inheritance: "Multifactorial", recommendation: "Non-Matching for impulsive traits" },
-    "BDNF": { inheritance: "Multifactorial", recommendation: "Non-Matching for resilience traits" },
-    "MAOA": { inheritance: "X-linked", recommendation: "Non-Matching for aggression traits" },
-    "NPY": { inheritance: "Multifactorial", recommendation: "Non-Matching for high-stress variants" },
-    "GABRA2": { inheritance: "Multifactorial", recommendation: "Non-Matching for anxiety traits" },
-    "HTR2A": { inheritance: "Multifactorial", recommendation: "Non-Matching for mood variants" }
-  };
-
-  let hasHighRisk = false;
-  let oneCarrierDetected = false;
-
-  for (const gene in geneticMarkers) {
-    if (userGeneticMarkers[gene] !== undefined) {
-      if (userGeneticMarkers[gene] === 1 && geneticMarkers[gene] === 1) {
-        // Both partners carry a mutation in a high-risk gene (e.g., HBB, PAH)
-        if (riskConditions[gene] &&
-          (riskConditions[gene].inheritance === "Autosomal recessive" ||
-            riskConditions[gene].inheritance === "Autosomal dominant")) {
-          return "red"; // 🔴 High-risk genetic match
+  const determineFlag = (userGeneticMarkers, geneticMarkers) => {
+    // If either user has no genetic markers at all (empty object or undefined), return blue
+    if (!userGeneticMarkers || Object.keys(userGeneticMarkers).length === 0) {
+      return "blue"; // 🔵 No genetic data available for the logged-in user
+    }
+  
+    if (!geneticMarkers || Object.keys(geneticMarkers).length === 0) {
+      return "blue"; // 🔵 No genetic data available for the matched user
+    }
+  
+    // If all markers are missing or null (not 0 or 1), return blue
+    const allMarkersMissing = Object.values(geneticMarkers).every(
+      marker => marker === null || marker === undefined
+    );
+  
+    if (allMarkersMissing) {
+      return "blue"; // 🔵 No genetic data available (all markers missing)
+    }
+  
+    // Rest of the existing logic for red/yellow/green flags...
+    const allOtherMarkersZero = Object.values(geneticMarkers).every(marker => marker === 0);
+  
+    if (allOtherMarkersZero) {
+      return "green"; // 🟢 No risk detected (other user has all markers as 0)
+    }
+  
+    const riskConditions = {
+      "ACE": { inheritance: "Multifactorial", recommendation: "No specific match needed" },
+      "HBB": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+      "PAH": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+      "BRCA1BRCA2": { inheritance: "Autosomal dominant", recommendation: "Avoid matching, both partners should not have mutations" },  // Merged BRCA1 and BRCA2
+      "FMR1": { inheritance: "X-linked dominant", recommendation: "Avoid matching, females carrying mutations may pass the disease to offspring" },
+      "SMN1": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+      "HEXA": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+      "ATP7B": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+      "GBA": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+      "GALT": { inheritance: "Autosomal recessive", recommendation: "Avoid matching if both partners are carriers" },
+      "TCF7L2": { inheritance: "Multifactorial", recommendation: "Non-Matching for high-risk diabetes alleles" },
+      "ADRB2": { inheritance: "Autosomal dominant", recommendation: "Non-Matching if both partners have asthma-related variants" },
+      "HLA": { inheritance: "Multifactorial", recommendation: "Match for complementary HLA alleles" },
+      "MC1R": { inheritance: "Autosomal recessive", recommendation: "No specific match required" },
+      "EDAR": { inheritance: "Autosomal dominant", recommendation: "No specific match required" },
+      "LEP": { inheritance: "Multifactorial", recommendation: "No specific match required" },
+      "FTO": { inheritance: "Multifactorial", recommendation: "Avoid pairing both with high-risk alleles" },
+      "CLOCK": { inheritance: "Multifactorial", recommendation: "No specific match required" },
+      "APOE": { inheritance: "Autosomal dominant", recommendation: "Avoid matching with high-risk APOE4 carriers" },
+      "OXTR": { inheritance: "Multifactorial", recommendation: "Non-Matching for optimal bonding" },
+      "AVPR1A": { inheritance: "Multifactorial", recommendation: "Non-Matching for commitment traits" },
+      "SLC6A4": { inheritance: "Multifactorial", recommendation: "Non-Matching for emotional stability" },
+      "COMT": { inheritance: "Multifactorial", recommendation: "Non-Matching for stress traits" },
+      "DRD4": { inheritance: "Multifactorial", recommendation: "Non-Matching for impulsive traits" },
+      "BDNF": { inheritance: "Multifactorial", recommendation: "Non-Matching for resilience traits" },
+      "MAOA": { inheritance: "X-linked", recommendation: "Non-Matching for aggression traits" },
+      "NPY": { inheritance: "Multifactorial", recommendation: "Non-Matching for high-stress variants" },
+      "GABRA2": { inheritance: "Multifactorial", recommendation: "Non-Matching for anxiety traits" },
+      "HTR2A": { inheritance: "Multifactorial", recommendation: "Non-Matching for mood variants" }
+    };
+  
+    let hasHighRisk = false;
+    let oneCarrierDetected = false;
+  
+    for (const gene in geneticMarkers) {
+      if (userGeneticMarkers[gene] !== undefined) {
+        if (userGeneticMarkers[gene] === 1 && geneticMarkers[gene] === 1) {
+          if (riskConditions[gene] &&
+            (riskConditions[gene].inheritance === "Autosomal recessive" ||
+              riskConditions[gene].inheritance === "Autosomal dominant")) {
+            return "red"; // 🔴 High-risk genetic match
+          }
+          hasHighRisk = true;
+        } else if (userGeneticMarkers[gene] === 1 || geneticMarkers[gene] === 1) {
+          if (riskConditions[gene] && riskConditions[gene].inheritance === "Autosomal dominant") {
+            return "red"; // 🔴 High-risk genetic match (Dominant conditions require only one mutation)
+          }
+          oneCarrierDetected = true;
         }
-        hasHighRisk = true;
-      } else if (userGeneticMarkers[gene] === 1 || geneticMarkers[gene] === 1) {
-        if (riskConditions[gene] && riskConditions[gene].inheritance === "Autosomal dominant") {
-          return "red"; // 🔴 High-risk genetic match (Dominant conditions require only one mutation)
-        }
-        oneCarrierDetected = true;
       }
     }
-  }
+  
+    if (hasHighRisk) {
+      return "red"; // 🔴 High genetic risk detected
+    }
+    if (oneCarrierDetected) {
+      return "yellow"; // 🟡 One partner is a carrier
+    }
+  
+    return "green"; // 🟢 No risk detected
+  };
 
-  if (hasHighRisk) {
-    return "red"; // 🔴 High genetic risk detected
-  }
-  if (oneCarrierDetected) {
-    return "yellow"; // 🟡 One partner is a carrier
-  }
-
-  return "green"; // 🟢 No risk detected
-};
 exports.removeDnaMatch = (req, res) => {
   const user_id = req.userId; // Logged-in user ID
   const { dna_match_user_id } = req.body; // User ID to remove from DNA match list
