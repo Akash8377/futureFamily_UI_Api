@@ -53,7 +53,7 @@ exports.filter_users = (req, res) => {
       }
 
       let query = `
-        SELECT profile_data.*, users.dob, users.gender, users.looking_for,
+        SELECT profile_data.*, users.dob, users.gender,region_of_residence, users.looking_for,
         users.first_name, users.last_name, users.profile_pic, users.dna, users.personality_type,
         TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age,
         COALESCE(user_shortlisted.status, 0) AS shortlist_status
@@ -93,6 +93,7 @@ exports.filter_users = (req, res) => {
 
       // Apply dynamic filters (explicit conditions)
       const {
+        region_of_residence,
         min_height,
         max_height,
         min_weight,
@@ -514,7 +515,7 @@ const getUserDetailsWithMatch = (loggedInUser, targetUserId, callback) => {
   // Fetch the target user's profile
   conn.query(
     `SELECT profile_data.*, users.dob, users.gender, users.looking_for, 
-    users.first_name, users.last_name, users.profile_pic, users.dna, users.personality_type,
+    users.first_name, users.last_name,region_of_residence, users.profile_pic, users.dna, users.personality_type,
     TIMESTAMPDIFF(YEAR, users.dob, CURDATE()) AS age
     FROM profile_data
     JOIN users ON profile_data.user_id = users.id
@@ -594,6 +595,7 @@ exports.getShortlistedUsers = (req, res) => {
       user_shortlisted.shortlisted_user_id,
       users.first_name,
       users.last_name,
+      users.region_of_residence,
       users.profile_pic,
       users.dob,
       users.gender,
@@ -646,6 +648,7 @@ exports.getShortlistedUsers = (req, res) => {
         return {
           ...user,
           full_name: shortlistedUser.first_name + " " + shortlistedUser.last_name,
+          region_of_residence: shortlistedUser.region_of_residence,
           profile_pic: shortlistedUser.profile_pic,
           age: calculateAge(shortlistedUser.dob), // Calculate age from DOB
           gender: shortlistedUser.gender,
@@ -665,6 +668,7 @@ exports.getNotificationsUsers = (req, res) => {
       notifications.notifications_user_id,
       users.first_name,
       users.last_name,
+      users.region_of_residence,
       users.profile_pic,
       users.dob,
       users.gender,
@@ -713,6 +717,7 @@ exports.getNotificationsUsers = (req, res) => {
         return {
           ...user,
           full_name: notificationUser.first_name + " " + notificationUser.last_name,
+          region_of_residence: notificationUser.region_of_residence,
           profile_pic: notificationUser.profile_pic,
           age: calculateAge(notificationUser.dob), // Calculate age from DOB
           gender: notificationUser.gender,
@@ -732,6 +737,7 @@ exports.getMaybeUsers = (req, res) => {
       user_maybe.maybe_user_id,
       users.first_name,
       users.last_name,
+      users.region_of_residence,
       users.profile_pic,
       users.dob,
       users.gender,
@@ -780,6 +786,7 @@ exports.getMaybeUsers = (req, res) => {
         return {
           ...userDetails,
           full_name: maybeUser.first_name + " " + maybeUser.last_name,
+          region_of_residence: maybeUser.region_of_residence,
           profile_pic: maybeUser.profile_pic,
           age: calculateAge(maybeUser.dob), // Calculate age from DOB
           personality_type: maybeUser.personality_type,
