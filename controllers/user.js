@@ -180,6 +180,7 @@ exports.getLogin = (req, res) => {
 exports.welcome = (req, res) => {
   const authToken = req.headers.authorization.split(" ")[1];
   const decode = jwt.verify(authToken, token_key);
+  console.log("User Id",decode.id)
   conn.query(
     `SELECT * FROM users where id =?`,
     decode.id,
@@ -193,7 +194,6 @@ exports.welcome = (req, res) => {
     }
   );
 };
-
 
 exports.logout = (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
