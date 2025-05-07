@@ -38,6 +38,7 @@ exports.savePersonalityResponses = (req, res) => {
 
   conn.query(insertQuery, [values], (err) => {
     if (err) {
+      console.log(err)
       return res.status(500).json({ msg: "Database error", error: err });
     }
 
@@ -54,6 +55,7 @@ exports.savePersonalityResponses = (req, res) => {
 
     conn.query(fullResponseQuery, [user_id], (err, responseData) => {
       if (err) {
+        console.log(err)
         return res.status(500).json({ msg: "Error fetching responses", error: err });
       }
 
@@ -77,6 +79,7 @@ exports.savePersonalityResponses = (req, res) => {
 
       conn.query(traitScoreQuery, [user_id], (err, traitResults) => {
         if (err) {
+          console.log(err)
           return res.status(500).json({ msg: "Error fetching trait scores", error: err });
         }
 
@@ -105,14 +108,56 @@ exports.savePersonalityResponses = (req, res) => {
     });
   });
 };
+
+
+// exports.getPersonalityResponses = (req, res) => {
+//   const user_id = req.params.userId;
+
+//   if (!user_id) {
+//     return res.status(400).json({ msg: "Invalid request data" });
+//   }
+
+//   // Query to get all questions and user's saved responses
+//   const fullResponseQuery = `
+//     SELECT pq.id AS question_id, 
+//            pq.trait, 
+//            IFNULL(upr.response, '') AS response
+//     FROM personality_questions pq
+//     LEFT JOIN user_personality_responses upr 
+//            ON pq.id = upr.question_id AND upr.user_id = ?
+//     ORDER BY pq.id;
+//   `;
+
+//   conn.query(fullResponseQuery, [user_id], (err, responseData) => {
+//     if (err) {
+//       return res.status(500).json({ msg: "Error fetching responses", error: err });
+//     }
+
+//     // Convert responses into key-value pairs and filter out empty responses
+//     const savedResponses = responseData.reduce((acc, row) => {
+//       if (row.response !== "") {
+//         acc[row.question_id] = String(row.response);
+//       }
+//       return acc;
+//     }, {});
+
+//     // Send API response
+//     res.status(200).json({
+//       msg: "Responses fetched successfully",
+//       saved_responses: savedResponses, // Only includes non-empty responses
+//     });
+//   });
+// };
+
 exports.getPersonalityResponses = (req, res) => {
   const user_id = req.params.userId;
-
-  if (!user_id) {
+  const region = req.query.region; // Get region from query string
+console.log("Region", region)
+  if (!user_id || !region) {
     return res.status(400).json({ msg: "Invalid request data" });
   }
 
-  // Query to get all questions and user's saved responses
+  // Query to get all questions from the given region and user's saved responses
   const fullResponseQuery = `
     SELECT pq.id AS question_id, 
            pq.trait, 
@@ -120,10 +165,11 @@ exports.getPersonalityResponses = (req, res) => {
     FROM personality_questions pq
     LEFT JOIN user_personality_responses upr 
            ON pq.id = upr.question_id AND upr.user_id = ?
+    WHERE pq.region = ?
     ORDER BY pq.id;
   `;
 
-  conn.query(fullResponseQuery, [user_id], (err, responseData) => {
+  conn.query(fullResponseQuery, [user_id, region], (err, responseData) => {
     if (err) {
       return res.status(500).json({ msg: "Error fetching responses", error: err });
     }
