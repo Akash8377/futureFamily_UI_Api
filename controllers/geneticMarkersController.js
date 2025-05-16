@@ -100,9 +100,10 @@ exports.getGeneticMarkers = (req, res) => {
   }
 
   const query = `
-    SELECT gene_name, response, created_at, updated_at 
-    FROM genetic_markers 
-    WHERE user_id = ?
+    SELECT gm.gene_name, gm.response, gm.created_at, gm.updated_at, u.first_name, u.last_name 
+    FROM genetic_markers gm 
+    JOIN users u ON gm.user_id = u.id 
+    WHERE gm.user_id = ?
   `;
 
   conn.query(query, [user_id], (err, results) => {
@@ -114,13 +115,19 @@ exports.getGeneticMarkers = (req, res) => {
       return res.status(404).json({ msg: "No genetic markers found for this user." });
     }
 
+    const { first_name, last_name } = results[0];
     const markers = {};
     results.forEach((row) => {
       markers[row.gene_name] = row.response;
     });
 
     const groupedMarkers = groupMarkers(markers);
-    res.status(200).json({ user_id, grouped_genetic_markers: groupedMarkers });
+    res.status(200).json({ 
+      user_id, 
+      first_name, 
+      last_name, 
+      grouped_genetic_markers: groupedMarkers 
+    });
   });
 };
 
