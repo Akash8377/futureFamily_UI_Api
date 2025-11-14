@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/auth");
+const { verifyToken, saveHlaData, getHlaData } = require("../middleware/auth");
 const userController = require("../controllers/user");
 const onboardingController = require("../controllers/onboarding");
 const userProfileController = require("../controllers/userProfile");
@@ -14,6 +15,7 @@ const messageListingController = require("../controllers/messageListingControlle
 const chatController = require("../controllers/chatController");
 const geneticMarkersController = require("../controllers/geneticMarkersController");
 const dnaMatch = require("../controllers/dnaMatching");
+const AstroController = require('../controllers/astroController');
 
 
 const {
@@ -107,5 +109,13 @@ router.post("/save-genetic-markers",auth.verifyToken, geneticMarkersController.s
  //dna-list 
  router.delete("/remove-dna-match", auth.verifyToken, dnaMatch.removeDnaMatch);
  router.get("/dna-list", auth.verifyToken, dnaMatch.getDnaMatch);
+
+
+router.post("/api/dna/save-hla-data", auth.verifyToken, geneticMarkersController.saveHlaData);
+router.get("/api/dna/get-hla-data", auth.verifyToken, geneticMarkersController.getHlaData);
+router.post('/compatibility', AstroController.calculateCompatibility);
+router.get('/astro-details', auth.verifyToken, AstroController.getAstroDetails);
+router.put('/astro-details', auth.verifyToken, AstroController.updateAstroDetails);
+
 
 module.exports = router; 
