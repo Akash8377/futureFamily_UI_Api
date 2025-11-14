@@ -117,5 +117,4 @@ router.post('/compatibility', AstroController.calculateCompatibility);
 router.get('/astro-details', auth.verifyToken, AstroController.getAstroDetails);
 router.put('/astro-details', auth.verifyToken, AstroController.updateAstroDetails);
 
-
 module.exports = router; 
